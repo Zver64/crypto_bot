@@ -57,11 +57,19 @@ class BybitResponse {
 }
 
 void main() {
-  final DotEnv env = DotEnv()..load();
+  String? token = Platform.environment['BOT_TOKEN'];
   
-  final String? token = env['BOT_TOKEN'] ?? Platform.environment['BOT_TOKEN'];
   if (token == null) {
-    print('BOT_TOKEN not found');
+    try {
+      final DotEnv env = DotEnv()..load();
+      token = env['BOT_TOKEN'];
+    } catch (e) {
+      // .env file not found
+    }
+  }
+  
+  if (token == null) {
+    print('BOT_TOKEN not found in environment or .env file');
     exit(1);
   }
   
