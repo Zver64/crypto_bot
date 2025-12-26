@@ -6,7 +6,8 @@ import 'package:televerse/televerse.dart';
 import 'package:http/http.dart' as http;
 
 final Set<int> subscribers = <int>{};
-double priceThreshold = 100.0;
+double priceThreshold = 25;
+Timer? priceCheckTimer;
 
 class BybitTicker {
   final String symbol;
@@ -69,14 +70,26 @@ void main() {
   bot.command('start', (ctx) => ctx.reply('Welcome! Use /subscribe to get 100% price alerts'));
   
   bot.command('subscribe', (ctx) async {
+    final bool wasEmpty = subscribers.isEmpty;
     subscribers.add(ctx.from!.id);
-    ctx.reply('✅ Subscribed to 100% price alerts!');
-    await checkPrices(bot);
+    ctx.reply('✅ Subscribed to $priceThreshold% price alerts!');
+    
+    if (wasEmpty) {
+      await checkPrices(bot);
+      priceCheckTimer = Timer.periodic(const Duration(minutes: 5), (Timer _) => checkPrices(bot));
+      print('Started price monitoring');
+    }
   });
   
   bot.command('unsubscribe', (ctx) {
     subscribers.remove(ctx.from!.id);
     ctx.reply('❌ Unsubscribed from price alerts');
+    
+    if (subscribers.isEmpty) {
+      priceCheckTimer?.cancel();
+      priceCheckTimer = null;
+      print('Stopped price monitoring');
+    }
   });
   
   bot.command('setthreshold', (ctx) {
@@ -95,8 +108,6 @@ void main() {
     priceThreshold = newThreshold;
     ctx.reply('✅ Price threshold set to ${priceThreshold.toStringAsFixed(1)}%');
   });
-  
-  Timer.periodic(const Duration(minutes: 5), (Timer _) => checkPrices(bot));
   
   bot.start();
 }
