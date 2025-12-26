@@ -6,7 +6,7 @@ import 'package:televerse/televerse.dart';
 import 'package:http/http.dart' as http;
 
 final Set<int> subscribers = <int>{};
-double priceThreshold = 25;
+double priceThreshold = 100;
 Timer? priceCheckTimer;
 
 class BybitTicker {
@@ -123,7 +123,7 @@ void main() {
 Future<void> checkPrices(Bot bot) async {
   print('Getting prices...');
   try {
-    final http.Response response = await http.get(Uri.parse('https://api.bybit.com/v5/market/tickers?category=spot'));
+    final http.Response response = await http.get(Uri.parse('https://api.bybit.com/v5/market/tickers?category=linear'));
     final Map<String, Object?> jsonData = json.decode(response.body) as Map<String, Object?>;
     final BybitResponse bybitResponse = BybitResponse.fromJson(jsonData);
     
