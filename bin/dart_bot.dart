@@ -6,6 +6,7 @@ import 'package:televerse/televerse.dart';
 import 'package:http/http.dart' as http;
 
 final Set<int> subscribers = <int>{};
+double priceThreshold = 100.0;
 
 class BybitTicker {
   final String symbol;
@@ -78,6 +79,23 @@ void main() {
     ctx.reply('❌ Unsubscribed from price alerts');
   });
   
+  bot.command('setthreshold', (ctx) {
+    final String? args = ctx.message?.text?.split(' ').skip(1).join(' ');
+    if (args == null || args.isEmpty) {
+      ctx.reply('Usage: /setthreshold <percentage>\nCurrent threshold: ${priceThreshold.toStringAsFixed(1)}%');
+      return;
+    }
+    
+    final double? newThreshold = double.tryParse(args);
+    if (newThreshold == null || newThreshold <= 0) {
+      ctx.reply('Invalid percentage. Please enter a positive number.');
+      return;
+    }
+    
+    priceThreshold = newThreshold;
+    ctx.reply('✅ Price threshold set to ${priceThreshold.toStringAsFixed(1)}%');
+  });
+  
   Timer.periodic(const Duration(minutes: 5), (Timer _) => checkPrices(bot));
   
   bot.start();
@@ -93,7 +111,7 @@ Future<void> checkPrices(Bot bot) async {
     for (final BybitTicker ticker in bybitResponse.result.list) {
       final double change24h = double.parse(ticker.price24hPcnt) * 100;
       
-      if (change24h >= 20) {
+      if (change24h >= priceThreshold) {
         final double currentPrice = double.parse(ticker.lastPrice);
         final String message = '🚀 ALERT: ${ticker.symbol} is up ${change24h.toStringAsFixed(2)}% in 24h!\nPrice: \$${currentPrice.toStringAsFixed(4)}';
         
