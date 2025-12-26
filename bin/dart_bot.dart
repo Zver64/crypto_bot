@@ -73,15 +73,23 @@ void main() {
 
   final Bot bot = Bot(token);
 
-  bot.command(
-    'start',
-    (ctx) => ctx.reply('Welcome! Use /subscribe to get 100% price alerts'),
-  );
+  bot.command('start', (ctx) => ctx.reply('Welcome! Use /menu to see available options.'));
+
+  bot.command('menu', (ctx) => ctx.reply(
+    'Available commands:\n'
+    '/subscribe - Get price alerts\n'
+    '/unsubscribe - Stop price alerts\n'
+    '/setthreshold - Set price threshold\n'
+    '/status - Check current settings'
+  ));
 
   bot.command('subscribe', (ctx) async {
+    final int? userId = ctx.from?.id;
+    if (userId == null) return;
+    
     final bool wasEmpty = subscribers.isEmpty;
-    subscribers.add(ctx.from!.id);
-    ctx.reply('✅ Subscribed to $priceThreshold% price alerts!');
+    subscribers.add(userId);
+    ctx.reply('✅ Subscribed to ${priceThreshold}% price alerts!');
 
     if (wasEmpty) {
       await checkPrices(bot);
@@ -94,7 +102,10 @@ void main() {
   });
 
   bot.command('unsubscribe', (ctx) {
-    subscribers.remove(ctx.from!.id);
+    final int? userId = ctx.from?.id;
+    if (userId == null) return;
+    
+    subscribers.remove(userId);
     ctx.reply('❌ Unsubscribed from price alerts');
 
     if (subscribers.isEmpty) {
@@ -105,22 +116,28 @@ void main() {
   });
 
   bot.command('setthreshold', (ctx) {
-    final String? args = ctx.message?.text?.split(' ').skip(1).join(' ');
-    if (args == null || args.isEmpty) {
-      ctx.reply(
-        'Usage: /setthreshold <percentage>\nCurrent threshold: ${priceThreshold.toStringAsFixed(1)}%',
-      );
-      return;
-    }
+    ctx.reply('Send me the threshold percentage (e.g., 50):');
+  });
 
-    final double? newThreshold = double.tryParse(args);
-    if (newThreshold == null || newThreshold <= 0) {
+  bot.hears(RegExp(r'^\d+\.?\d*$'), (ctx) {
+    final String text = ctx.message!.text!;
+    final double? newThreshold = double.tryParse(text);
+    
+    if (newThreshold != null && newThreshold > 0) {
+      priceThreshold = newThreshold;
+      ctx.reply('✅ Price threshold set to ${priceThreshold.toStringAsFixed(1)}%');
+    } else {
       ctx.reply('Invalid percentage. Please enter a positive number.');
-      return;
     }
+  });
 
-    priceThreshold = newThreshold;
-    ctx.reply('✅ Price threshold set to ${priceThreshold.toStringAsFixed(1)}%');
+  bot.command('status', (ctx) {
+    ctx.reply(
+      'Current settings:\n'
+      'Threshold: ${priceThreshold.toStringAsFixed(1)}%\n'
+      'Subscribers: ${subscribers.length}\n'
+      'Monitoring: ${priceCheckTimer != null ? "Active" : "Inactive"}'
+    );
   });
 
   bot.start();
