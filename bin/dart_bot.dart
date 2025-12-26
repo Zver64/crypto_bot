@@ -37,9 +37,11 @@ class BybitResult {
   factory BybitResult.fromJson(Map<String, Object?> json) {
     final List<Object?> tickerList = json['list'] as List<Object?>;
     final List<BybitTicker> tickers = tickerList
-        .map((Object? item) => BybitTicker.fromJson(item as Map<String, Object?>))
+        .map(
+          (Object? item) => BybitTicker.fromJson(item as Map<String, Object?>),
+        )
         .toList();
-    
+
     return BybitResult(list: tickers);
   }
 }
@@ -58,82 +60,90 @@ class BybitResponse {
 
 void main() {
   String? token = Platform.environment['BOT_TOKEN'];
-  
+
   if (token == null) {
-    try {
-      final DotEnv env = DotEnv()..load();
-      token = env['BOT_TOKEN'];
-    } catch (e) {
-      // .env file not found
-    }
+    final DotEnv env = DotEnv()..load();
+    token = env['BOT_TOKEN'];
   }
-  
+
   if (token == null) {
     print('BOT_TOKEN not found in environment or .env file');
     exit(1);
   }
-  
+
   final Bot bot = Bot(token);
-  
-  bot.command('start', (ctx) => ctx.reply('Welcome! Use /subscribe to get 100% price alerts'));
-  
+
+  bot.command(
+    'start',
+    (ctx) => ctx.reply('Welcome! Use /subscribe to get 100% price alerts'),
+  );
+
   bot.command('subscribe', (ctx) async {
     final bool wasEmpty = subscribers.isEmpty;
     subscribers.add(ctx.from!.id);
     ctx.reply('✅ Subscribed to $priceThreshold% price alerts!');
-    
+
     if (wasEmpty) {
       await checkPrices(bot);
-      priceCheckTimer = Timer.periodic(const Duration(minutes: 5), (Timer _) => checkPrices(bot));
+      priceCheckTimer = Timer.periodic(
+        const Duration(minutes: 5),
+        (Timer _) => checkPrices(bot),
+      );
       print('Started price monitoring');
     }
   });
-  
+
   bot.command('unsubscribe', (ctx) {
     subscribers.remove(ctx.from!.id);
     ctx.reply('❌ Unsubscribed from price alerts');
-    
+
     if (subscribers.isEmpty) {
       priceCheckTimer?.cancel();
       priceCheckTimer = null;
       print('Stopped price monitoring');
     }
   });
-  
+
   bot.command('setthreshold', (ctx) {
     final String? args = ctx.message?.text?.split(' ').skip(1).join(' ');
     if (args == null || args.isEmpty) {
-      ctx.reply('Usage: /setthreshold <percentage>\nCurrent threshold: ${priceThreshold.toStringAsFixed(1)}%');
+      ctx.reply(
+        'Usage: /setthreshold <percentage>\nCurrent threshold: ${priceThreshold.toStringAsFixed(1)}%',
+      );
       return;
     }
-    
+
     final double? newThreshold = double.tryParse(args);
     if (newThreshold == null || newThreshold <= 0) {
       ctx.reply('Invalid percentage. Please enter a positive number.');
       return;
     }
-    
+
     priceThreshold = newThreshold;
     ctx.reply('✅ Price threshold set to ${priceThreshold.toStringAsFixed(1)}%');
   });
-  
+
   bot.start();
 }
 
 Future<void> checkPrices(Bot bot) async {
   print('Getting prices...');
   try {
-    final http.Response response = await http.get(Uri.parse('https://api.bybit.com/v5/market/tickers?category=linear'));
-    final Map<String, Object?> jsonData = json.decode(response.body) as Map<String, Object?>;
+    final http.Response response = await http.get(
+      Uri.parse('https://api.bybit.com/v5/market/tickers?category=linear'),
+    );
+    final Map<String, Object?> jsonData =
+        json.decode(response.body) as Map<String, Object?>;
     final BybitResponse bybitResponse = BybitResponse.fromJson(jsonData);
-    
+
     for (final BybitTicker ticker in bybitResponse.result.list) {
       final double change24h = double.parse(ticker.price24hPcnt) * 100;
-      
+
       if (change24h >= priceThreshold) {
         final double currentPrice = double.parse(ticker.lastPrice);
-        final String message = '🚀 ALERT: ${ticker.symbol} is up ${change24h.toStringAsFixed(2)}% in 24h!\nPrice: \$${currentPrice.toStringAsFixed(4)}';
-        
+        final String message =
+            '🚀 ALERT: ${ticker.symbol} is up ${change24h.toStringAsFixed(2)}% in 24h!\nPrice: \$${currentPrice.toStringAsFixed(4)}';
+
         for (final int userId in subscribers) {
           try {
             await bot.api.sendMessage(ChatID(userId), message);
@@ -143,6 +153,7 @@ Future<void> checkPrices(Bot bot) async {
         }
       }
     }
+    print('finished price check');
   } catch (e) {
     print('Error checking prices: $e');
   }
