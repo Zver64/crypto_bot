@@ -7,14 +7,6 @@ import '../services/bot_state.dart';
 void setupCommands(Bot bot) {
   bot.command('start', (ctx) => ctx.reply('Welcome! Use /menu to see available options.'));
 
-  bot.command('menu', (ctx) => ctx.reply(
-    'Available commands:\n'
-    '/subscribe - Get price alerts\n'
-    '/unsubscribe - Stop price alerts\n'
-    '/setthreshold - Set price threshold\n'
-    '/status - Check current settings'
-  ));
-
   bot.command('subscribe', (ctx) async {
     final int? userId = ctx.from?.id;
     if (userId == null) return;
