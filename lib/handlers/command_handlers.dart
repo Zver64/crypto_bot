@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:televerse/televerse.dart';
+import 'package:televerse/telegram.dart';
 import 'package:televerse/plugins/conversation.dart';
 import '../services/price_service.dart';
 import '../services/bot_state.dart';
 
-void setupCommands(Bot bot) {
+Future<void> setupCommands(Bot bot) async {
   bot.command('start', (ctx) => ctx.reply('Welcome! Use /menu to see available options.'));
 
   bot.command('subscribe', (ctx) async {
@@ -52,4 +53,16 @@ void setupCommands(Bot bot) {
       'Monitoring: ${BotState.getTimer() != null ? "Active" : "Inactive"}'
     );
   });
+}
+
+Future<void> setCommandsAPI(Bot bot) async {
+  await bot.api.setMyCommands([
+    BotCommand(command: 'start', description: 'Начать работу'),
+    BotCommand(command: 'subscribe', description: 'Подписаться на уведомления'),
+    BotCommand(command: 'unsubscribe', description: 'Отписаться от уведомлений'),
+    BotCommand(command: 'setthreshold', description: 'Установить порог уведомлений'),
+    BotCommand(command: 'status', description: 'Показать текущие настройки'),
+  ], scope: BotCommandScopeAllPrivateChats());
+
+  await bot.api.setChatMenuButton(MenuButtonCommands());
 }

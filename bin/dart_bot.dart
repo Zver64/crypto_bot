@@ -6,7 +6,7 @@ import 'package:dotenv/dotenv.dart';
 import 'package:televerse/televerse.dart';
 import 'package:televerse/plugins/conversation.dart';
 
-void main() {
+void main() async {
   String? token = Platform.environment['BOT_TOKEN'];
 
   if (token == null) {
@@ -25,7 +25,9 @@ void main() {
 
   bot.use(createConversation(ConversationNames.threshold.name, setThresholdHandler));
 
-  setupCommands(bot);
+  await setupCommands(bot);
+  
+  await setCommandsAPI(bot);
 
   bot.start();
 }
