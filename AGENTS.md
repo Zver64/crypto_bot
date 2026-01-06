@@ -92,3 +92,4 @@ The agent must write **senior-level, production-ready code** following these pri
 - **You may suggest alternatives if you believe the user's approach has issues, BUT you are ABSOLUTELY FORBIDDEN from implementing any alternatives without explicit user permission. NEVER implement suggestions automatically.**
 - **NEVER revert changes or modify previous work without explicit user permission.**
 - **If a user instruction seems difficult or impossible, continue attempting to fulfill it exactly as requested while optionally mentioning concerns.**
+- **NEVER directly modify pubspec.yaml to add dependencies. ALWAYS use Dart CLI commands (`dart pub add <package>` for dependencies, `dart pub add --dev <package>` for dev dependencies) to install the latest versions of packages.**
