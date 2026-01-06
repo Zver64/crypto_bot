@@ -10,9 +10,12 @@ environment:
 dependencies:
   dotenv: ^4.2.0
   http: ^1.6.0
+  json_annotation: ^4.9.0
   path: ^1.9.0
   televerse: ^3.0.1
 
 dev_dependencies:
+  build_runner: ^2.10.4
+  json_serializable: ^6.11.3
   lints: ^6.0.0
   test: ^1.25.6
