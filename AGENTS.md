@@ -6,41 +6,6 @@ This is a **Telegram Bot** built with **Dart** using the **Televerse**
 framework. The bot provides cryptocurrency price monitoring and alerting
 functionality, specifically tracking price changes from the Bybit exchange API.
 
-## Core Functionality
-
-- **Price Monitoring**: Fetches cryptocurrency prices from Bybit API and monitors 24-hour percentage changes
-- **User Subscriptions**: Allows users to subscribe/unsubscribe to price alerts via Telegram commands
-- **Threshold Management**: Users can set custom price change thresholds for notifications
-- **Real-time Alerts**: Sends notifications to subscribers when price changes exceed their threshold
-- **Command Interface**: Full Telegram bot command system with menu integration
-
-## Technical Architecture
-
-### Framework & Dependencies
-
-- **Dart SDK**: ^3.10.4
-- **Televerse**: ^3.0.1 (Telegram Bot API framework)
-- **HTTP**: ^1.6.0 (API requests)
-- **DotEnv**: ^4.2.0 (Environment configuration)
-
-### Project Structure
-
-```
-lib/
-├── handlers/           # Bot command and conversation handlers
-├── services/          # Business logic (price monitoring, bot state)
-├── models/           # Data models (Bybit API responses)
-└── constants.dart    # Application constants
-```
-
-### Key Components
-
-- **Command Handlers**: Telegram bot commands (start, subscribe, unsubscribe, setthreshold, status)
-- **Price Service**: Bybit API integration and price monitoring logic
-- **Bot State**: Global state management for subscribers and configuration
-- **Conversation System**: Interactive threshold setting via Televerse conversations
-- **Data Models**: Type-safe JSON parsing for external API responses
-
 ## Code Quality Requirements
 
 ### Senior-Level Standards
@@ -61,22 +26,6 @@ The agent must write **senior-level, production-ready code** following these pri
 - **Immutability**: Use immutable data structures where appropriate
 - **Resource Management**: Proper cleanup of timers, HTTP connections, and subscriptions
 
-#### Best Practices
-
-- **Documentation**: Clear dartdoc comments for public APIs
-- **Testing**: Unit tests for business logic, integration tests for API interactions
-- **Configuration**: Environment-based configuration management
-- **Security**: Secure token handling, input validation, rate limiting
-- **Performance**: Efficient API usage, proper caching strategies
-- **Maintainability**: Clear naming conventions, modular design, easy to extend
-
-#### Dart-Specific Standards
-
-- **Effective Dart**: Follow official Dart style guide and best practices
-- **Linting**: Adhere to strict linting rules (analysis_options.yaml configured)
-- **Package Structure**: Proper library organization and exports
-- **Future/Stream**: Appropriate use of Dart's asynchronous primitives
-
 ## Development Guidelines
 
 - Write clean, readable, and maintainable code
@@ -93,3 +42,4 @@ The agent must write **senior-level, production-ready code** following these pri
 - **NEVER revert changes or modify previous work without explicit user permission.**
 - **If a user instruction seems difficult or impossible, continue attempting to fulfill it exactly as requested while optionally mentioning concerns.**
 - **NEVER directly modify pubspec.yaml to add dependencies. ALWAYS use Dart CLI commands (`dart pub add <package>` for dependencies, `dart pub add --dev <package>` for dev dependencies) to install the latest versions of packages.**
+- always check your changes by running `dart analyze`
