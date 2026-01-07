@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:televerse/televerse.dart';
 import 'package:televerse/telegram.dart';
 import 'package:televerse/plugins/conversation.dart';
-import '../services/price_service.dart';
-import '../services/bot_state.dart';
+import '../services/subscription_service.dart';
 
 Future<void> setupCommands(Bot bot) async {
   bot.command('start', (ctx) => ctx.reply('Welcome! Use /menu to see available options.'));
@@ -12,33 +11,16 @@ Future<void> setupCommands(Bot bot) async {
     final int? userId = ctx.from?.id;
     if (userId == null) return;
     
-    final bool wasEmpty = BotState.subscribers.isEmpty;
-    BotState.subscribers.add(userId);
-    ctx.reply('✅ Subscribed to ${BotState.getThreshold()}% price alerts!');
-
-    if (wasEmpty) {
-      await checkPrices(bot, BotState.subscribers, BotState.getThreshold());
-      final timer = Timer.periodic(
-        const Duration(minutes: 5),
-        (Timer _) => checkPrices(bot, BotState.subscribers, BotState.getThreshold()),
-      );
-      BotState.setTimer(timer);
-      print('Started price monitoring');
-    }
+    final message = await SubscriptionService.subscribe(userId, bot);
+    ctx.reply(message);
   });
 
   bot.command('unsubscribe', (ctx) {
     final int? userId = ctx.from?.id;
     if (userId == null) return;
     
-    BotState.subscribers.remove(userId);
-    ctx.reply('❌ Unsubscribed from price alerts');
-
-    if (BotState.subscribers.isEmpty) {
-      BotState.getTimer()?.cancel();
-      BotState.setTimer(null);
-      print('Stopped price monitoring');
-    }
+    final message = SubscriptionService.unsubscribe(userId);
+    ctx.reply(message);
   });
 
   bot.command('setthreshold', (ctx) async {
@@ -46,12 +28,7 @@ Future<void> setupCommands(Bot bot) async {
   });
 
   bot.command('status', (ctx) {
-    ctx.reply(
-      'Current settings:\n'
-      'Threshold: ${BotState.getThreshold().toStringAsFixed(1)}%\n'
-      'Subscribers: ${BotState.subscribers.length}\n'
-      'Monitoring: ${BotState.getTimer() != null ? "Active" : "Inactive"}'
-    );
+    ctx.reply(SubscriptionService.getStatus());
   });
 }
 

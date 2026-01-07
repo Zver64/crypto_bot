@@ -3,15 +3,25 @@ import 'package:televerse/plugins/conversation.dart';
 import '../services/bot_state.dart';
 
 Future<void> setThresholdHandler(Conversation conversation, Context ctx) async {
-  await ctx.reply('Send me the threshold percentage (e.g., 50):');
+  await ctx.reply('Send me the min cap threshold (e.g., 200):');
   
-  final response = await conversation.waitFor((ctx) => RegExp(r'^\d+\.?\d*$').hasMatch(ctx.text ?? ''));
-  final double? newThreshold = double.tryParse(response.text ?? '');
+  final minCapResponse = await conversation.waitFor((ctx) => RegExp(r'^\d+$').hasMatch(ctx.text ?? ''));
+  final int? minCap = int.tryParse(minCapResponse.text ?? '');
   
-  if (newThreshold != null && newThreshold > 0) {
-    BotState.setThreshold(newThreshold);
-    await response.reply('✅ Price threshold set to ${newThreshold.toStringAsFixed(1)}%');
+  if (minCap == null || minCap <= 0) {
+    await minCapResponse.reply('Invalid min cap. Please enter a positive integer.');
+    return;
+  }
+
+  await minCapResponse.reply('Send me the max cap threshold (e.g., 10):');
+  
+  final maxCapResponse = await conversation.waitFor((ctx) => RegExp(r'^\d+$').hasMatch(ctx.text ?? ''));
+  final int? maxCap = int.tryParse(maxCapResponse.text ?? '');
+  
+  if (maxCap != null && maxCap > 0) {
+    BotState.setThreshold(minCap, maxCap);
+    await maxCapResponse.reply('✅ Thresholds set: min cap $minCap, max cap $maxCap');
   } else {
-    await response.reply('Invalid percentage. Please enter a positive number.');
+    await maxCapResponse.reply('Invalid max cap. Please enter a positive integer.');
   }
 }
