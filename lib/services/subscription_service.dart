@@ -39,6 +39,6 @@ class SubscriptionService {
         'Threshold: ${BotState.getThreshold()}\n'
         'Subscribers: ${BotState.subscribers.length}\n'
         'Monitoring: ${BotState.getTimer() != null ? "Active" : "Inactive"}\n'
-        'Cached coins: ${BotState.marketCapCache.length}';
+        'Cached coins: ${BotState.circulatingSupplyCache.length}';
   }
 }

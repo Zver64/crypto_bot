@@ -4,6 +4,6 @@ GET https://api.bybit.com/v5/market/tickers?category=linear
 ###
 
 # get circulating supply info for number of coins
-GET https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=btc,eth,sol
+GET https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=1000RATS
 Accept: application/json
 

@@ -21,7 +21,7 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, double>> getCoinGeckoMarketCaps(List<String> symbols) async {
+  static Future<Map<String, BigInt>> getCoinGeckoCirculatingSupply(List<String> symbols) async {
     if (symbols.isEmpty) return {};
     
     try {
@@ -35,17 +35,17 @@ class ApiService {
       }
       
       final data = json.decode(response.body) as List<dynamic>;
-      final marketCaps = <String, double>{};
+      final circulatingSupplies = <String, BigInt>{};
       
       for (final coin in data) {
         final symbol = coin['symbol'].toString().toUpperCase();
-        final marketCap = coin['market_cap']?.toDouble();
-        if (marketCap != null) {
-          marketCaps[symbol] = marketCap;
+        final circulatingSupply = coin['circulating_supply'];
+        if (circulatingSupply != null) {
+          circulatingSupplies[symbol] = BigInt.from(circulatingSupply.toDouble());
         }
       }
       
-      return marketCaps;
+      return circulatingSupplies;
     } catch (e) {
       print('ERROR: CoinGecko API call failed: $e');
       rethrow;

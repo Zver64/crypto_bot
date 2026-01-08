@@ -17,7 +17,7 @@ class BotState {
   static final Set<int> subscribers = <int>{};
   static Threshold priceThreshold = Threshold(Config.defaultMinCapThreshold, Config.defaultMaxCapThreshold);
   static Timer? priceCheckTimer;
-  static final Map<String, double> marketCapCache = <String, double>{};
+  static final Map<String, BigInt> circulatingSupplyCache = <String, BigInt>{};
 
   static String getThreshold() => priceThreshold.toString();
   static void setThreshold(int minCap, int maxCap) {
