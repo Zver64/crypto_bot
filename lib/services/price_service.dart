@@ -48,7 +48,6 @@ Future<void> checkPrices(Bot bot, Set<int> subscribers, Threshold threshold) asy
         final BigInt scaledMarketCap = circulatingSupply * scaledPrice;
         final BigInt marketCapBigInt = scaledMarketCap ~/ BigInt.from(1e12.toInt());
         final double marketCap = marketCapBigInt.toDouble();
-        print('market cap for ${ticker.symbol} is $marketCap');
         
         final double dynamicThreshold = volatilityFromMcap(marketCap, 
           smallMcap: threshold.minCap.toDouble(), 
