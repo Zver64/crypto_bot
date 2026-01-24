@@ -47,26 +47,9 @@ class SubscriptionService {
   }
 
   static Future<void> _refreshCache() async {
-    print('Refreshing circulating supply cache...');
-    final symbols = BotState.circulatingSupplyCache.keys.toList();
-    if (symbols.isNotEmpty) {
-      try {
-        final supplyResults = await BatchProcessor.batchProcess<Map<String, BigInt>, String>(
-          symbols,
-          ApiService.getCoinGeckoCirculatingSupply,
-          delay: Config.batchProcessDelay,
-        );
-        
-        BotState.circulatingSupplyCache.clear();
-        for (final supplies in supplyResults) {
-          BotState.circulatingSupplyCache.addAll(supplies);
-        }
-        
-        print('Cache refreshed: ${BotState.circulatingSupplyCache.length} coins');
-      } catch (e) {
-        print('Cache refresh failed: $e');
-      }
-    }
+    print('Resetting circulating supply cache...');
+    BotState.circulatingSupplyCache.clear();
+    print('Cache reset: ${BotState.circulatingSupplyCache.length} coins');
   }
 
   static String getStatus() {
