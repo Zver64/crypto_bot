@@ -26,6 +26,9 @@ class SubscriptionService {
       );
       BotState.cacheRefreshTimer = cacheTimer;
       
+      // Start midnight reset timer
+      _scheduleMidnightReset();
+      
       print('Started price monitoring and cache refresh');
     }
     
@@ -40,10 +43,26 @@ class SubscriptionService {
       BotState.setTimer(null);
       BotState.cacheRefreshTimer?.cancel();
       BotState.cacheRefreshTimer = null;
+      BotState.midnightResetTimer?.cancel();
+      BotState.midnightResetTimer = null;
       print('Stopped price monitoring and cache refresh');
     }
     
     return '❌ Unsubscribed from price alerts';
+  }
+
+  static void _scheduleMidnightReset() {
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    final durationUntilMidnight = nextMidnight.difference(now);
+    
+    BotState.midnightResetTimer = Timer(durationUntilMidnight, () {
+      BotState.resetMaxPrices();
+      BotState.midnightResetTimer = Timer.periodic(
+        const Duration(days: 1),
+        (Timer _) => BotState.resetMaxPrices(),
+      );
+    });
   }
 
   static Future<void> _refreshCache() async {

@@ -55,26 +55,34 @@ Future<void> checkPrices(Bot bot, Set<int> subscribers, Threshold threshold) asy
 
         if (change24h >= dynamicThreshold) {
           final double currentPrice = double.parse(ticker.lastPrice);
-          final String message =
-              '🚀 ALERT: ${ticker.symbol} is up ${change24h.toStringAsFixed(2)}% in 24h!\nPrice: \$${currentPrice.toStringAsFixed(4)}\nThreshold: ${dynamicThreshold.toStringAsFixed(1)}%';
+          
+          // Check if price exceeds previous max
+          final double? previousMax = BotState.maxNotifiedPrices[ticker.symbol];
+          if (previousMax == null || currentPrice > previousMax) {
+            final String message =
+                '🚀 ALERT: ${ticker.symbol} is up ${change24h.toStringAsFixed(2)}% in 24h!\nPrice: \$${currentPrice.toStringAsFixed(4)}\nThreshold: ${dynamicThreshold.toStringAsFixed(1)}%';
 
-          final List<int> usersToRemove = [];
-          
-          for (final int userId in subscribers) {
-            try {
-              await bot.api.sendMessage(ChatID(userId), message);
-            } catch (e) {
-              print('Failed to send to $userId: $e - Auto-unsubscribing');
-              usersToRemove.add(userId);
+            final List<int> usersToRemove = [];
+            
+            for (final int userId in subscribers) {
+              try {
+                await bot.api.sendMessage(ChatID(userId), message);
+              } catch (e) {
+                print('Failed to send to $userId: $e - Auto-unsubscribing');
+                usersToRemove.add(userId);
+              }
             }
-          }
-          
-          for (final int userId in usersToRemove) {
-            subscribers.remove(userId);
-          }
-          
-          if (usersToRemove.isNotEmpty) {
-            print('Auto-unsubscribed ${usersToRemove.length} unreachable users');
+            
+            for (final int userId in usersToRemove) {
+              subscribers.remove(userId);
+            }
+            
+            if (usersToRemove.isNotEmpty) {
+              print('Auto-unsubscribed ${usersToRemove.length} unreachable users');
+            }
+            
+            // Update max notified price
+            BotState.maxNotifiedPrices[ticker.symbol] = currentPrice;
           }
         }
       }

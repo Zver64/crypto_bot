@@ -19,6 +19,8 @@ class BotState {
   static Timer? priceCheckTimer;
   static final Map<String, BigInt> circulatingSupplyCache = <String, BigInt>{};
   static Timer? cacheRefreshTimer;
+  static final Map<String, double> maxNotifiedPrices = <String, double>{};
+  static Timer? midnightResetTimer;
 
   static String getThreshold() => priceThreshold.toString();
   static void setThreshold(int minCap, int maxCap) {
@@ -29,4 +31,5 @@ class BotState {
   static void setMaxCapThreshold(int maxCap) => priceThreshold.maxCap = maxCap;
   static Timer? getTimer() => priceCheckTimer;
   static void setTimer(Timer? timer) => priceCheckTimer = timer;
+  static void resetMaxPrices() => maxNotifiedPrices.clear();
 }
