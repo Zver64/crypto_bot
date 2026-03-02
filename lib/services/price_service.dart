@@ -50,10 +50,12 @@ Future<void> checkPrices(Bot bot, Set<int> subscribers, Threshold threshold) asy
         final BigInt scaledMarketCap = circulatingSupply * scaledPrice;
         final BigInt marketCapBigInt = scaledMarketCap ~/ BigInt.from(1e12.toInt());
         final double marketCap = marketCapBigInt.toDouble();
-        
-        final double dynamicThreshold = volatilityFromMcap(marketCap, 
-          smallMcap: threshold.minCap.toDouble(), 
-          largeVol: threshold.maxCap.toDouble());
+
+        final double dynamicThreshold = volatilityFromMcap(
+          marketCap,
+          smallVol: threshold.minCap.toDouble(),
+          largeVol: threshold.maxCap.toDouble(),
+        );
 
         if (change24h >= dynamicThreshold) {
           final double currentPrice = double.parse(ticker.lastPrice);
