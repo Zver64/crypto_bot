@@ -8,34 +8,35 @@ class SubscriptionService {
   static Future<String> subscribe(int userId, Bot bot) async {
     final bool wasEmpty = BotState.subscribers.isEmpty;
     BotState.subscribers.add(userId);
-    
+
     if (wasEmpty) {
       await checkPrices(bot, BotState.subscribers, BotState.priceThreshold);
       final timer = Timer.periodic(
         Config.priceCheckInterval,
-        (Timer _) => checkPrices(bot, BotState.subscribers, BotState.priceThreshold),
+        (Timer _) =>
+            checkPrices(bot, BotState.subscribers, BotState.priceThreshold),
       );
       BotState.setTimer(timer);
-      
+
       // Start cache refresh timer
       final cacheTimer = Timer.periodic(
         Config.cacheRefreshInterval,
         (Timer _) => _refreshCache(),
       );
       BotState.cacheRefreshTimer = cacheTimer;
-      
+
       // Start midnight reset timer
       _scheduleMidnightReset();
-      
+
       print('Started price monitoring and cache refresh');
     }
-    
+
     return '✅ Subscribed to ${BotState.getThreshold()} price alerts!';
   }
 
   static String unsubscribe(int userId) {
     BotState.subscribers.remove(userId);
-    
+
     if (BotState.subscribers.isEmpty) {
       BotState.getTimer()?.cancel();
       BotState.setTimer(null);
@@ -45,7 +46,7 @@ class SubscriptionService {
       BotState.midnightResetTimer = null;
       print('Stopped price monitoring and cache refresh');
     }
-    
+
     return '❌ Unsubscribed from price alerts';
   }
 
@@ -53,7 +54,7 @@ class SubscriptionService {
     final now = DateTime.now();
     final nextMidnight = DateTime(now.year, now.month, now.day + 1);
     final durationUntilMidnight = nextMidnight.difference(now);
-    
+
     BotState.midnightResetTimer = Timer(durationUntilMidnight, () {
       BotState.resetMaxPrices();
       BotState.midnightResetTimer = Timer.periodic(

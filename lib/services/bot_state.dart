@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../config/app_config.dart';
+import '../models/coin_analysis_models.dart';
 
 class Threshold {
   int minCap;
@@ -15,10 +16,15 @@ class Threshold {
 
 class BotState {
   static final Set<int> subscribers = <int>{};
-  static Threshold priceThreshold = Threshold(Config.defaultMinCapThreshold, Config.defaultMaxCapThreshold);
+  static Threshold priceThreshold = Threshold(
+    Config.defaultMinCapThreshold,
+    Config.defaultMaxCapThreshold,
+  );
   static Timer? priceCheckTimer;
   static final Map<String, String> generatedTickerCache = <String, String>{};
   static final Map<String, BigInt> circulatingSupplyCache = <String, BigInt>{};
+  static final Map<String, MarketSnapshot> marketSnapshots =
+      <String, MarketSnapshot>{};
   static Timer? cacheRefreshTimer;
   static final Map<String, double> maxNotifiedPrices = <String, double>{};
   static Timer? midnightResetTimer;
@@ -28,6 +34,7 @@ class BotState {
     priceThreshold.minCap = minCap;
     priceThreshold.maxCap = maxCap;
   }
+
   static void setMinCapThreshold(int minCap) => priceThreshold.minCap = minCap;
   static void setMaxCapThreshold(int maxCap) => priceThreshold.maxCap = maxCap;
   static Timer? getTimer() => priceCheckTimer;

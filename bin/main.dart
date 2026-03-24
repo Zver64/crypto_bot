@@ -20,13 +20,18 @@ void main() async {
   }
 
   final Bot bot = Bot(token);
-  
+
   bot.plugin(ConversationPlugin());
 
-  bot.use(createConversation(ConversationNames.threshold.name, setThresholdHandler));
+  bot.use(
+    createConversation(ConversationNames.threshold.name, setThresholdHandler),
+  );
+  bot.use(
+    createConversation(ConversationNames.analyze.name, analyzeCoinHandler),
+  );
 
   await setupCommands(bot);
-  
+
   await setCommandsAPI(bot);
 
   bot.start();

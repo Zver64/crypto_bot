@@ -27,3 +27,55 @@ String formatCompactUsd(double value) {
   }
   return '\$${value.toStringAsFixed(2)}';
 }
+
+String formatPercentValue(double? value, {int decimals = 2}) {
+  if (value == null) {
+    return 'n/a';
+  }
+
+  return '${value.toStringAsFixed(decimals)}%';
+}
+
+String formatRatioAsPercent(double? value) {
+  if (value == null) {
+    return 'n/a';
+  }
+
+  final percentValue = value * 100;
+  if (percentValue >= 10) {
+    return '${percentValue.toStringAsFixed(1)}%';
+  }
+  if (percentValue >= 1) {
+    return '${percentValue.toStringAsFixed(2)}%';
+  }
+  if (percentValue >= 0.1) {
+    return '${percentValue.toStringAsFixed(3)}%';
+  }
+  if (percentValue >= 0.01) {
+    return '${percentValue.toStringAsFixed(4)}%';
+  }
+  return '${percentValue.toStringAsFixed(5)}%';
+}
+
+String formatFundingPeriod(int? minutes) {
+  if (minutes == null || minutes <= 0) {
+    return 'n/a';
+  }
+  if (minutes % 60 == 0) {
+    return '${minutes ~/ 60}h';
+  }
+  return '${minutes}m';
+}
+
+String formatNextFundingTime(DateTime? value) {
+  if (value == null) {
+    return 'n/a';
+  }
+
+  final utcValue = value.toUtc();
+  final month = utcValue.month.toString().padLeft(2, '0');
+  final day = utcValue.day.toString().padLeft(2, '0');
+  final hour = utcValue.hour.toString().padLeft(2, '0');
+  final minute = utcValue.minute.toString().padLeft(2, '0');
+  return '$month-$day $hour:$minute UTC';
+}
