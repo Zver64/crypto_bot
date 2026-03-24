@@ -3,6 +3,16 @@ GET https://api.bybit.com/v5/market/tickers?category=linear
 
 ###
 
+# get specific ticker
+
+GET https://api.bybit.com/v5/market/tickers?category=linear&symbol=1000PEPEUSDT
+
+###
+
+GET https://api.bybit.com/v5/market/instruments-info?category=linear&symbol=1000PEPEUSDT
+
+###
+
 # get circulating supply info for number of coins
 GET https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=1000RATS
 Accept: application/json
