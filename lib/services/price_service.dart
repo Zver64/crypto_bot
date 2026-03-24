@@ -1,4 +1,5 @@
 import 'package:televerse/televerse.dart';
+import 'package:televerse/telegram.dart';
 import '../services/bot_state.dart';
 import '../services/api_service.dart';
 import '../services/batch_processor.dart';
@@ -99,12 +100,16 @@ Future<void> checkPrices(Bot bot, Set<int> subscribers, Threshold threshold) asy
         );
 
         if (change24h >= dynamicThreshold) {
-          final double currentPrice = double.parse(ticker.lastPrice);
-          
           // Check if price exceeds previous max
           final double? previousMax = BotState.maxNotifiedPrices[ticker.symbol];
           if (previousMax == null || currentPrice > previousMax) {
-            alerts.add('${ticker.symbol}: +${change24h.toStringAsFixed(2)}% | \$${currentPrice.toStringAsFixed(4)} (threshold: ${dynamicThreshold.toStringAsFixed(1)}%)');
+            alerts.add(_buildAlertMessage(
+              symbol: ticker.symbol,
+              change24h: change24h,
+              currentPrice: currentPrice,
+              threshold: dynamicThreshold,
+              marketCap: marketCap,
+            ));
             BotState.maxNotifiedPrices[ticker.symbol] = currentPrice;
           }
         }
@@ -112,13 +117,17 @@ Future<void> checkPrices(Bot bot, Set<int> subscribers, Threshold threshold) asy
     }
 
     if (alerts.isNotEmpty) {
-      final String message = '🚀 ALERTS:\n\n${alerts.join('\n')}';
+      final String message = '🚀 ALERTS:\n\n${alerts.join('\n\n──────────\n\n')}';
       
       final List<int> usersToRemove = [];
       
       for (final int userId in subscribers) {
         try {
-          await bot.api.sendMessage(ChatID(userId), message);
+          await bot.api.sendMessage(
+            ChatID(userId),
+            message,
+            parseMode: ParseMode.html,
+          );
         } catch (e) {
           print('Failed to send to $userId: $e - Auto-unsubscribing');
           usersToRemove.add(userId);
@@ -163,4 +172,20 @@ String _generateTickerFromBaseCoin(String baseCoin) {
   }
 
   return normalizedBaseCoin;
+}
+
+String _buildAlertMessage({
+  required String symbol,
+  required double change24h,
+  required double currentPrice,
+  required double threshold,
+  required double marketCap,
+}) {
+  return [
+    '<b>$symbol</b>',
+    '<b>Price:</b> \$${currentPrice.toStringAsFixed(4)}',
+    '<b>24h Change:</b> +${change24h.toStringAsFixed(2)}%',
+    '<b>Market Cap:</b> ${formatCompactUsd(marketCap)}',
+    '<b>Alert Threshold:</b> ${threshold.toStringAsFixed(1)}%',
+  ].join('\n');
 }

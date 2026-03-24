@@ -14,3 +14,16 @@ double volatilityFromMcap(
   final a = smallVol * pow(smallMcap, b);
   return a * pow(mcap, -b);
 }
+
+String formatCompactUsd(double value) {
+  if (value >= 1000000000) {
+    return '\$${(value / 1000000000).toStringAsFixed(2)}B';
+  }
+  if (value >= 1000000) {
+    return '\$${(value / 1000000).toStringAsFixed(2)}M';
+  }
+  if (value >= 1000) {
+    return '\$${(value / 1000).toStringAsFixed(2)}K';
+  }
+  return '\$${value.toStringAsFixed(2)}';
+}
