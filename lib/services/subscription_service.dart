@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:televerse/televerse.dart';
 import '../services/bot_state.dart';
 import '../services/price_service.dart';
-import '../services/batch_processor.dart';
-import '../services/api_service.dart';
 import '../config/app_config.dart';
 
 class SubscriptionService {
@@ -67,6 +65,7 @@ class SubscriptionService {
 
   static Future<void> _refreshCache() async {
     print('Resetting circulating supply cache...');
+    BotState.generatedTickerCache.clear();
     BotState.circulatingSupplyCache.clear();
     print('Cache reset: ${BotState.circulatingSupplyCache.length} coins');
   }

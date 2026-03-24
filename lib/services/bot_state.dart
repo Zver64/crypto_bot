@@ -17,6 +17,7 @@ class BotState {
   static final Set<int> subscribers = <int>{};
   static Threshold priceThreshold = Threshold(Config.defaultMinCapThreshold, Config.defaultMaxCapThreshold);
   static Timer? priceCheckTimer;
+  static final Map<String, String> generatedTickerCache = <String, String>{};
   static final Map<String, BigInt> circulatingSupplyCache = <String, BigInt>{};
   static Timer? cacheRefreshTimer;
   static final Map<String, double> maxNotifiedPrices = <String, double>{};

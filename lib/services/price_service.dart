@@ -11,37 +11,78 @@ Future<void> checkPrices(Bot bot, Set<int> subscribers, Threshold threshold) asy
     final bybitResponse = await ApiService.getBybitTickers();
     final coinList = bybitResponse.result.list;
     print('got ${coinList.length} coins');
-    final filteredCoinList = coinList.where((data) => double.parse(data.price24hPcnt) > 0.09);
+    final filteredCoinList = coinList.where((data) => double.parse(data.price24hPcnt) > 0.09).toList();
     print('${filteredCoinList.length} coins are filtered');
-    // Check for missing circulating supplies and fetch only those
-    final symbols = filteredCoinList 
-        .map((ticker) => ticker.symbol.replaceAll('USDT', '').replaceAll('USDC', ''))
+    final List<String> alerts = [];
+
+    final symbolsWithoutGeneratedTicker = filteredCoinList
+        .map((ticker) => ticker.symbol)
+        .where((symbol) => !BotState.generatedTickerCache.containsKey(symbol))
         .toList();
-    
-    final missingSymbols = symbols.where((symbol) => !BotState.circulatingSupplyCache.containsKey(symbol)).toList();
-    
-    if (missingSymbols.isNotEmpty) {
-      print('Fetching circulating supplies for ${missingSymbols.length} missing coins');
-      final supplyResults = await BatchProcessor.batchProcess<Map<String, BigInt>, String>(
-        missingSymbols,
-        ApiService.getCoinGeckoCirculatingSupply,
-        delay: Config.batchProcessDelay,
-      );
-      
-      // Merge all results
-      for (final supplies in supplyResults) {
-        BotState.circulatingSupplyCache.addAll(supplies);
+
+    if (symbolsWithoutGeneratedTicker.isNotEmpty) {
+      final instruments = await ApiService.getBybitInstrumentsBySymbols(symbolsWithoutGeneratedTicker);
+      for (final symbol in symbolsWithoutGeneratedTicker) {
+        final instrument = instruments[symbol];
+        if (instrument == null) {
+          continue;
+        }
+
+        BotState.generatedTickerCache[symbol] = _generateTickerFromBaseCoin(instrument.baseCoin);
       }
-      
-      print('Total circulating supplies cached: ${BotState.circulatingSupplyCache.length}');
     }
 
-    final List<String> alerts = [];
+    final missingSymbols = filteredCoinList
+        .map((ticker) => ticker.symbol)
+        .where((symbol) => !BotState.circulatingSupplyCache.containsKey(symbol))
+        .toList();
+
+    final missingGeneratedTickers = missingSymbols
+        .map((symbol) => BotState.generatedTickerCache[symbol])
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    if (missingGeneratedTickers.isNotEmpty) {
+      print('Fetching circulating supplies for ${missingGeneratedTickers.length} missing coins');
+      try {
+        final supplyResults = await BatchProcessor.batchProcess<Map<String, BigInt>, String>(
+          missingGeneratedTickers,
+          ApiService.getCoinGeckoCirculatingSupply,
+          delay: Config.batchProcessDelay,
+        );
+
+        final mergedSupplies = <String, BigInt>{};
+        for (final supplies in supplyResults) {
+          mergedSupplies.addAll(supplies);
+        }
+
+        for (final symbol in missingSymbols) {
+          final generatedTicker = BotState.generatedTickerCache[symbol];
+          if (generatedTicker == null) continue;
+          final circulatingSupply = mergedSupplies[generatedTicker];
+          if (circulatingSupply != null) {
+            BotState.circulatingSupplyCache[symbol] = circulatingSupply;
+          }
+        }
+
+        final notFoundSymbols = missingSymbols
+            .where((symbol) => !BotState.circulatingSupplyCache.containsKey(symbol))
+            .toList();
+        if (notFoundSymbols.isNotEmpty) {
+          print('No CoinGecko supply match for: $notFoundSymbols');
+        }
+
+        print('Total circulating supplies cached: ${BotState.circulatingSupplyCache.length}');
+      } catch (e) {
+        print('ERROR: CoinGecko supply lookup failed: $e');
+        alerts.add('⚠️ CoinGecko supply lookup failed for some filtered coins');
+      }
+    }
 
     for (final ticker in filteredCoinList) {
       final double change24h = double.parse(ticker.price24hPcnt) * 100;
-      final String baseSymbol = ticker.symbol.replaceAll('USDT', '').replaceAll('USDC', '');
-      final BigInt? circulatingSupply = BotState.circulatingSupplyCache[baseSymbol];
+      final BigInt? circulatingSupply = BotState.circulatingSupplyCache[ticker.symbol];
       
       if (circulatingSupply != null && circulatingSupply > BigInt.zero) {
         final double currentPrice = double.parse(ticker.lastPrice);
@@ -97,4 +138,29 @@ Future<void> checkPrices(Bot bot, Set<int> subscribers, Threshold threshold) asy
   } catch (e) {
     print('Error checking prices: $e');
   }
+}
+
+String _generateTickerFromBaseCoin(String baseCoin) {
+  final normalizedBaseCoin = baseCoin.trim().toUpperCase();
+  const allowedMultipliers = <String>[
+    '10',
+    '100',
+    '1000',
+    '10000',
+    '100000',
+    '1000000',
+  ];
+
+  for (final prefix in allowedMultipliers) {
+    if (!normalizedBaseCoin.startsWith(prefix) || normalizedBaseCoin.length == prefix.length) {
+      continue;
+    }
+
+    final candidate = normalizedBaseCoin.substring(prefix.length);
+    if (RegExp(r'^[A-Z]+$').hasMatch(candidate)) {
+      return candidate;
+    }
+  }
+
+  return normalizedBaseCoin;
 }
