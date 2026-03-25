@@ -16,10 +16,19 @@ class RateLimitedException implements Exception {
 
 class ApiService {
   static const String _bybitBaseUrl = 'https://api.bybit.com';
+  static http.Client _httpClient = http.Client();
+
+  static void setHttpClient(http.Client client) {
+    _httpClient = client;
+  }
+
+  static void resetHttpClient() {
+    _httpClient = http.Client();
+  }
 
   static Future<BybitResponse> getBybitTickers() async {
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$_bybitBaseUrl/v5/market/tickers?category=linear'),
       );
 
@@ -59,7 +68,7 @@ class ApiService {
 
     try {
       final symbolsParam = symbols.join(',');
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse(
           'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=$symbolsParam',
         ),
@@ -111,7 +120,7 @@ class ApiService {
     String cursor = '';
 
     while (true) {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse(
           '$_bybitBaseUrl/v5/market/instruments-info?category=linear&limit=1000${cursor.isNotEmpty ? '&cursor=$cursor' : ''}',
         ),
@@ -152,7 +161,7 @@ class ApiService {
     String cursor = '';
 
     while (true) {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse(
           '$_bybitBaseUrl/v5/market/instruments-info?category=linear&limit=1000${cursor.isNotEmpty ? '&cursor=$cursor' : ''}',
         ),
@@ -185,7 +194,7 @@ class ApiService {
     String symbol, {
     int limit = 50,
   }) async {
-    final response = await http.get(
+    final response = await _httpClient.get(
       Uri.parse(
         '$_bybitBaseUrl/v5/market/orderbook?category=linear&symbol=$symbol&limit=$limit',
       ),

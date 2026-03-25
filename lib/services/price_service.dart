@@ -40,7 +40,7 @@ Future<void> checkPrices(
           continue;
         }
 
-        BotState.generatedTickerCache[symbol] = _generateTickerFromBaseCoin(
+        BotState.generatedTickerCache[symbol] = generateTickerFromBaseCoin(
           instrument.baseCoin,
         );
       }
@@ -174,9 +174,9 @@ Future<void> checkPrices(
   }
 }
 
-String _generateTickerFromBaseCoin(String baseCoin) {
+String generateTickerFromBaseCoin(String baseCoin) {
   final normalizedBaseCoin = baseCoin.trim().toUpperCase();
-  final multiplierPrefix = _extractMultiplierPrefix(normalizedBaseCoin);
+  final multiplierPrefix = extractMultiplierPrefix(normalizedBaseCoin);
   if (multiplierPrefix != null) {
     return normalizedBaseCoin.substring(multiplierPrefix.length);
   }
@@ -184,9 +184,9 @@ String _generateTickerFromBaseCoin(String baseCoin) {
   return normalizedBaseCoin;
 }
 
-int _extractBaseCoinMultiplier(String baseCoin) {
+int extractBaseCoinMultiplier(String baseCoin) {
   final normalizedBaseCoin = baseCoin.trim().toUpperCase();
-  final multiplierPrefix = _extractMultiplierPrefix(normalizedBaseCoin);
+  final multiplierPrefix = extractMultiplierPrefix(normalizedBaseCoin);
   if (multiplierPrefix == null) {
     return 1;
   }
@@ -194,7 +194,7 @@ int _extractBaseCoinMultiplier(String baseCoin) {
   return int.parse(multiplierPrefix);
 }
 
-String? _extractMultiplierPrefix(String normalizedBaseCoin) {
+String? extractMultiplierPrefix(String normalizedBaseCoin) {
   const allowedMultipliers = <String>[
     '10',
     '100',
@@ -219,7 +219,21 @@ String? _extractMultiplierPrefix(String normalizedBaseCoin) {
   return null;
 }
 
-double? _calculateDistanceFromAthPct(double currentPrice, double? athPrice) {
+double normalizeContractPrice(double contractPrice, String baseCoin) {
+  return contractPrice / extractBaseCoinMultiplier(baseCoin);
+}
+
+double calculateMarketCapFromSupply({
+  required BigInt circulatingSupply,
+  required double underlyingPrice,
+}) {
+  final scaledPrice = BigInt.from((underlyingPrice * 1e12).round());
+  final scaledMarketCap = circulatingSupply * scaledPrice;
+  final marketCapBigInt = scaledMarketCap ~/ BigInt.from(1e12.toInt());
+  return marketCapBigInt.toDouble();
+}
+
+double? calculateDistanceFromAthPct(double currentPrice, double? athPrice) {
   if (athPrice == null || athPrice <= 0) {
     return null;
   }
@@ -236,7 +250,7 @@ Future<String> analyzeCoin(String rawTicker) async {
   try {
     final instruments = await ApiService.getAllBybitLinearInstruments();
     final matchingInstruments = instruments.where((instrument) {
-      final generatedTicker = _generateTickerFromBaseCoin(instrument.baseCoin);
+      final generatedTicker = generateTickerFromBaseCoin(instrument.baseCoin);
       return generatedTicker == normalizedTicker;
     }).toList();
 
@@ -260,7 +274,7 @@ Future<String> analyzeCoin(String rawTicker) async {
 
     BotState.generatedTickerCache.putIfAbsent(
       normalizedSymbol,
-      () => _generateTickerFromBaseCoin(instrument.baseCoin),
+      () => generateTickerFromBaseCoin(instrument.baseCoin),
     );
 
     final generatedTicker = BotState.generatedTickerCache[normalizedSymbol]!;
@@ -281,13 +295,15 @@ Future<String> analyzeCoin(String rawTicker) async {
       return 'Could not parse price for $normalizedSymbol.';
     }
 
-    final baseCoinMultiplier = _extractBaseCoinMultiplier(instrument.baseCoin);
-    final normalizedPrice = currentPrice / baseCoinMultiplier;
-    final scaledPrice = BigInt.from((normalizedPrice * 1e12).round());
-    final scaledMarketCap = circulatingSupply * scaledPrice;
-    final marketCapBigInt = scaledMarketCap ~/ BigInt.from(1e12.toInt());
-    final marketCap = marketCapBigInt.toDouble();
-    final distanceFromAthPct = _calculateDistanceFromAthPct(
+    final normalizedPrice = normalizeContractPrice(
+      currentPrice,
+      instrument.baseCoin,
+    );
+    final marketCap = calculateMarketCapFromSupply(
+      circulatingSupply: circulatingSupply,
+      underlyingPrice: normalizedPrice,
+    );
+    final distanceFromAthPct = calculateDistanceFromAthPct(
       normalizedPrice,
       coinGeckoMarketData?.ath,
     );
