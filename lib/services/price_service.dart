@@ -176,6 +176,25 @@ Future<void> checkPrices(
 
 String _generateTickerFromBaseCoin(String baseCoin) {
   final normalizedBaseCoin = baseCoin.trim().toUpperCase();
+  final multiplierPrefix = _extractMultiplierPrefix(normalizedBaseCoin);
+  if (multiplierPrefix != null) {
+    return normalizedBaseCoin.substring(multiplierPrefix.length);
+  }
+
+  return normalizedBaseCoin;
+}
+
+int _extractBaseCoinMultiplier(String baseCoin) {
+  final normalizedBaseCoin = baseCoin.trim().toUpperCase();
+  final multiplierPrefix = _extractMultiplierPrefix(normalizedBaseCoin);
+  if (multiplierPrefix == null) {
+    return 1;
+  }
+
+  return int.parse(multiplierPrefix);
+}
+
+String? _extractMultiplierPrefix(String normalizedBaseCoin) {
   const allowedMultipliers = <String>[
     '10',
     '100',
@@ -193,11 +212,19 @@ String _generateTickerFromBaseCoin(String baseCoin) {
 
     final candidate = normalizedBaseCoin.substring(prefix.length);
     if (RegExp(r'^[A-Z]+$').hasMatch(candidate)) {
-      return candidate;
+      return prefix;
     }
   }
 
-  return normalizedBaseCoin;
+  return null;
+}
+
+double? _calculateDistanceFromAthPct(double currentPrice, double? athPrice) {
+  if (athPrice == null || athPrice <= 0) {
+    return null;
+  }
+
+  return ((currentPrice / athPrice) - 1) * 100;
 }
 
 Future<String> analyzeCoin(String rawTicker) async {
@@ -254,10 +281,16 @@ Future<String> analyzeCoin(String rawTicker) async {
       return 'Could not parse price for $normalizedSymbol.';
     }
 
-    final scaledPrice = BigInt.from((currentPrice * 1e12).round());
+    final baseCoinMultiplier = _extractBaseCoinMultiplier(instrument.baseCoin);
+    final normalizedPrice = currentPrice / baseCoinMultiplier;
+    final scaledPrice = BigInt.from((normalizedPrice * 1e12).round());
     final scaledMarketCap = circulatingSupply * scaledPrice;
     final marketCapBigInt = scaledMarketCap ~/ BigInt.from(1e12.toInt());
     final marketCap = marketCapBigInt.toDouble();
+    final distanceFromAthPct = _calculateDistanceFromAthPct(
+      normalizedPrice,
+      coinGeckoMarketData?.ath,
+    );
 
     final orderbook = await ApiService.getBybitOrderbook(normalizedSymbol);
     final analysis = CoinAnalysisService.analyze(
@@ -267,7 +300,7 @@ Future<String> analyzeCoin(String rawTicker) async {
       generatedTicker: generatedTicker,
       marketCap: marketCap,
       athPrice: coinGeckoMarketData?.ath,
-      distanceFromAthPct: coinGeckoMarketData?.athChangePercentage,
+      distanceFromAthPct: distanceFromAthPct,
     );
 
     final riskLabel = switch (analysis.riskLevel) {
@@ -279,9 +312,9 @@ Future<String> analyzeCoin(String rawTicker) async {
     return [
       '<b>${analysis.symbol}</b> (${analysis.generatedTicker})',
       '<b>Risk:</b> $riskLabel (${analysis.riskScore}/100)',
-      '<b>Price:</b> \$${currentPrice.toStringAsFixed(4)}',
+      '<b>Price:</b> ${formatUsdPrice(normalizedPrice)}',
       '<b>Market Cap:</b> ${formatCompactUsd(analysis.marketCap)}',
-      '<b>ATH:</b> ${analysis.athPrice == null ? 'n/a' : formatCompactUsd(analysis.athPrice!)}',
+      '<b>ATH:</b> ${analysis.athPrice == null ? 'n/a' : formatUsdPrice(analysis.athPrice!)}',
       '<b>Distance from ATH:</b> ${formatPercentValue(analysis.distanceFromAthPct)}',
       '<b>Visible Depth:</b> ${analysis.visibleDepthUsd == null ? 'n/a' : formatCompactUsd(analysis.visibleDepthUsd!)}',
       '<b>Visible Depth vs Market Cap:</b> ${formatRatioAsPercent(analysis.visibleDepthToMarketCapRatio)}',

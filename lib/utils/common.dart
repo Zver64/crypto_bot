@@ -28,6 +28,22 @@ String formatCompactUsd(double value) {
   return '\$${value.toStringAsFixed(2)}';
 }
 
+String formatUsdPrice(double value) {
+  if (value >= 1000) {
+    return formatCompactUsd(value);
+  }
+  if (value >= 1) {
+    return '\$${value.toStringAsFixed(2)}';
+  }
+  if (value >= 0.01) {
+    return '\$${value.toStringAsFixed(4)}';
+  }
+  if (value >= 0.0001) {
+    return '\$${value.toStringAsFixed(6)}';
+  }
+  return '\$${value.toStringAsFixed(8)}';
+}
+
 String formatPercentValue(double? value, {int decimals = 2}) {
   if (value == null) {
     return 'n/a';
