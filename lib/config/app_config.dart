@@ -1,9 +1,9 @@
 class Config {
   static const Duration priceCheckInterval = Duration(minutes: 5);
   static const Duration cacheRefreshInterval = Duration(hours: 6);
-  static const int defaultMinCapThreshold = 200;
+  static const int defaultMinCapThreshold = 100;
   static const int defaultMaxCapThreshold = 10;
-  static const double defaultMinMarketCap = 50000000;
+  static const double defaultMinMarketCap = 500000000;
   static const double defaultMaxMarketCap = 2000000000000;
   static const Duration batchProcessDelay = Duration(seconds: 10);
 }
