@@ -248,11 +248,7 @@ Future<String> analyzeCoin(String rawTicker) async {
   }
 
   try {
-    final instruments = await ApiService.getAllBybitLinearInstruments();
-    final matchingInstruments = instruments.where((instrument) {
-      final generatedTicker = generateTickerFromBaseCoin(instrument.baseCoin);
-      return generatedTicker == normalizedTicker;
-    }).toList();
+    final matchingInstruments = await _findAnalyzeInstruments(normalizedTicker);
 
     if (matchingInstruments.isEmpty) {
       return 'Ticker $normalizedTicker was not found on Bybit linear futures.';
@@ -264,10 +260,7 @@ Future<String> analyzeCoin(String rawTicker) async {
     );
     final normalizedSymbol = instrument.symbol;
 
-    final tickers = await ApiService.getBybitTickers();
-    final bybitTicker = tickers.result.list
-        .where((item) => item.symbol == normalizedSymbol)
-        .firstOrNull;
+    final bybitTicker = await ApiService.getBybitTickerBySymbol(normalizedSymbol);
     if (bybitTicker == null) {
       return 'Symbol $normalizedSymbol was not found on Bybit linear futures.';
     }
@@ -338,6 +331,39 @@ Future<String> analyzeCoin(String rawTicker) async {
   } on RateLimitedException catch (e) {
     return e.message;
   }
+}
+
+Future<List<BybitInstrument>> _findAnalyzeInstruments(String normalizedTicker) async {
+  for (final candidateBaseCoin in _buildAnalyzeBaseCoinCandidates(normalizedTicker)) {
+    final instruments = await ApiService.getBybitLinearInstrumentsByBaseCoin(
+      candidateBaseCoin,
+    );
+    final matchingInstruments = instruments.where((instrument) {
+      return generateTickerFromBaseCoin(instrument.baseCoin) == normalizedTicker;
+    }).toList(growable: false);
+
+    if (matchingInstruments.isNotEmpty) {
+      return matchingInstruments;
+    }
+  }
+
+  return const <BybitInstrument>[];
+}
+
+List<String> _buildAnalyzeBaseCoinCandidates(String normalizedTicker) {
+  const allowedMultipliers = <String>[
+    '10',
+    '100',
+    '1000',
+    '10000',
+    '100000',
+    '1000000',
+  ];
+
+  return <String>[
+    normalizedTicker,
+    ...allowedMultipliers.map((prefix) => '$prefix$normalizedTicker'),
+  ];
 }
 
 String getAnalyzeFaqMessage() {

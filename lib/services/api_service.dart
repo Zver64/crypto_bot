@@ -46,6 +46,29 @@ class ApiService {
     }
   }
 
+  static Future<BybitTicker?> getBybitTickerBySymbol(String symbol) async {
+    try {
+      final response = await _httpClient.get(
+        Uri.parse(
+          '$_bybitBaseUrl/v5/market/tickers?category=linear&symbol=${symbol.trim().toUpperCase()}',
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to fetch Bybit ticker for $symbol: ${response.statusCode}',
+        );
+      }
+
+      final jsonData = json.decode(response.body) as Map<String, dynamic>;
+      final parsed = BybitResponse.fromJson(jsonData);
+      return parsed.result.list.firstOrNull;
+    } catch (e) {
+      print('ERROR: Bybit ticker API call failed for $symbol: $e');
+      rethrow;
+    }
+  }
+
   static Future<Map<String, BigInt>> getCoinGeckoCirculatingSupply(
     List<String> symbols,
   ) async {
@@ -154,6 +177,36 @@ class ApiService {
     }
 
     return instruments;
+  }
+
+  static Future<List<BybitInstrument>> getBybitLinearInstrumentsByBaseCoin(
+    String baseCoin,
+  ) async {
+    final normalizedBaseCoin = baseCoin.trim().toUpperCase();
+    if (normalizedBaseCoin.isEmpty) {
+      return const <BybitInstrument>[];
+    }
+
+    final response = await _httpClient.get(
+      Uri.parse(
+        '$_bybitBaseUrl/v5/market/instruments-info?category=linear&baseCoin=$normalizedBaseCoin',
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to fetch Bybit instruments for $normalizedBaseCoin: ${response.statusCode}',
+      );
+    }
+
+    final jsonData = json.decode(response.body) as Map<String, dynamic>;
+    final result = jsonData['result'] as Map<String, dynamic>? ?? const {};
+    final list = result['list'] as List<dynamic>? ?? const [];
+
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(BybitInstrument.fromJson)
+        .toList(growable: false);
   }
 
   static Future<List<BybitInstrument>> getAllBybitLinearInstruments() async {
