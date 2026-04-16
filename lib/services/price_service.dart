@@ -1,6 +1,5 @@
 import 'package:televerse/televerse.dart';
 import 'package:televerse/telegram.dart';
-import '../models/bybit_instrument_models.dart';
 import '../models/coingecko_market_models.dart';
 import '../models/coin_analysis_models.dart';
 import '../services/bot_state.dart';
@@ -242,66 +241,38 @@ Future<String> analyzeCoin(String rawTicker) async {
   }
 
   try {
-    final matchingInstruments = await _findAnalyzeInstruments(normalizedTicker);
-
-    if (matchingInstruments.isEmpty) {
-      return 'Ticker $normalizedTicker was not found on Bybit linear futures.';
-    }
-
-    final instrument = _selectInstrumentForTicker(
-      matchingInstruments,
+    final marketCandidates = await ApiService.getCoinGeckoMarketDataBySymbol(
       normalizedTicker,
     );
-    final normalizedSymbol = instrument.symbol;
-
-    final bybitTicker = await ApiService.getBybitTickerBySymbol(
-      normalizedSymbol,
+    final marketData = _selectCoinGeckoMarketData(
+      marketCandidates,
+      normalizedTicker,
     );
-    if (bybitTicker == null) {
-      return 'Symbol $normalizedSymbol was not found on Bybit linear futures.';
+
+    if (marketData == null) {
+      return 'No CoinGecko market data match for $normalizedTicker.';
     }
 
-    BotState.generatedTickerCache.putIfAbsent(
-      normalizedSymbol,
-      () => generateTickerFromBaseCoin(instrument.baseCoin),
-    );
-
-    final generatedTicker = BotState.generatedTickerCache[normalizedSymbol]!;
-    final marketData = await ApiService.getCoinGeckoMarketData([
-      generatedTicker,
-    ]);
-    final coinGeckoMarketData = marketData[generatedTicker.toUpperCase()];
-    final marketCap = coinGeckoMarketData?.marketCap;
+    final marketCap = marketData.marketCap;
 
     if (marketCap == null || marketCap <= 0) {
-      return 'No CoinGecko market cap match for $normalizedSymbol.';
+      return 'No CoinGecko market cap match for $normalizedTicker.';
     }
 
-    BotState.baseCoinCache[normalizedSymbol] = instrument.baseCoin;
-    BotState.marketCapCache[normalizedSymbol] = marketCap;
-
-    final currentPrice = double.tryParse(bybitTicker.lastPrice);
-    if (currentPrice == null) {
-      return 'Could not parse price for $normalizedSymbol.';
+    final currentPrice = marketData.currentPrice;
+    if (currentPrice == null || currentPrice <= 0) {
+      return 'Could not parse CoinGecko price for $normalizedTicker.';
     }
 
-    final normalizedPrice = normalizeContractPrice(
-      currentPrice,
-      instrument.baseCoin,
-    );
     final distanceFromAthPct = calculateDistanceFromAthPct(
-      normalizedPrice,
-      coinGeckoMarketData?.ath,
+      currentPrice,
+      marketData.ath,
     );
 
-    final orderbook = await ApiService.getBybitOrderbook(normalizedSymbol);
+    final tickers = await ApiService.getCoinGeckoCoinTickers(marketData.id);
     final analysis = CoinAnalysisService.analyze(
-      ticker: bybitTicker,
-      instrument: instrument,
-      orderbook: orderbook,
-      generatedTicker: generatedTicker,
-      marketCap: marketCap,
-      athPrice: coinGeckoMarketData?.ath,
+      marketData: marketData,
+      tickers: tickers,
       distanceFromAthPct: distanceFromAthPct,
     );
 
@@ -312,58 +283,19 @@ Future<String> analyzeCoin(String rawTicker) async {
     };
 
     return [
-      '<b>${analysis.symbol}</b> (${analysis.generatedTicker})',
+      '<b>${analysis.name}</b> (${analysis.symbol})',
       '<b>Risk:</b> $riskLabel (${analysis.riskScore}/100)',
-      '<b>Price:</b> ${formatUsdPrice(normalizedPrice)}',
+      '<b>Price:</b> ${formatUsdPrice(currentPrice)}',
       '<b>Market Cap:</b> ${formatCompactUsd(analysis.marketCap)}',
       '<b>ATH:</b> ${analysis.athPrice == null ? 'n/a' : formatUsdPrice(analysis.athPrice!)}',
       '<b>Distance from ATH:</b> ${formatPercentValue(analysis.distanceFromAthPct)}',
-      '<b>Visible Depth:</b> ${analysis.visibleDepthUsd == null ? 'n/a' : formatCompactUsd(analysis.visibleDepthUsd!)}',
-      '<b>Visible Depth vs Market Cap:</b> ${formatRatioAsPercent(analysis.visibleDepthToMarketCapRatio)}',
+      '<b>24h Volume:</b> ${analysis.volume24hUsd == null ? 'n/a' : formatCompactUsd(analysis.volume24hUsd!)}',
+      '<b>2% Market Depth:</b> ${analysis.twoPercentDepthUsd == null ? 'n/a' : formatCompactUsd(analysis.twoPercentDepthUsd!)}',
+      '<b>2% Depth vs Market Cap:</b> ${formatRatioAsPercent(analysis.twoPercentDepthToMarketCapRatio)}',
     ].join('\n');
   } on RateLimitedException catch (e) {
     return e.message;
   }
-}
-
-Future<List<BybitInstrument>> _findAnalyzeInstruments(
-  String normalizedTicker,
-) async {
-  for (final candidateBaseCoin in _buildAnalyzeBaseCoinCandidates(
-    normalizedTicker,
-  )) {
-    final instruments = await ApiService.getBybitLinearInstrumentsByBaseCoin(
-      candidateBaseCoin,
-    );
-    final matchingInstruments = instruments
-        .where((instrument) {
-          return generateTickerFromBaseCoin(instrument.baseCoin) ==
-              normalizedTicker;
-        })
-        .toList(growable: false);
-
-    if (matchingInstruments.isNotEmpty) {
-      return matchingInstruments;
-    }
-  }
-
-  return const <BybitInstrument>[];
-}
-
-List<String> _buildAnalyzeBaseCoinCandidates(String normalizedTicker) {
-  const allowedMultipliers = <String>[
-    '10',
-    '100',
-    '1000',
-    '10000',
-    '100000',
-    '1000000',
-  ];
-
-  return <String>[
-    normalizedTicker,
-    ...allowedMultipliers.map((prefix) => '$prefix$normalizedTicker'),
-  ];
 }
 
 String getAnalyzeFaqMessage() {
@@ -384,34 +316,40 @@ String getAnalyzeFaqMessage() {
     '<b>Distance from ATH</b>:',
     'Показывает, на сколько процентов текущая цена ниже исторического максимума.',
     '',
-    '<b>Visible Depth</b>:',
-    'Это видимая ликвидность в стакане около текущей цены. Чем она меньше, тем легче двигать рынок.',
+    '<b>24h Volume</b>:',
+    'Это агрегированный объём торгов за 24 часа по данным CoinGecko.',
     '',
-    '<b>Visible Depth vs Market Cap</b>:',
+    '<b>2% Market Depth</b>:',
+    'Это консервативная оценка глубины из CoinGecko ticker depth.',
+    'Она считается по cost_to_move_up_usd и cost_to_move_down_usd и показывает, сколько USD нужно, чтобы сдвинуть цену примерно на 2%.',
+    '',
+    '<b>2% Depth vs Market Cap</b>:',
     'Главный показатель для этой проверки.',
-    'Он показывает, насколько капитализация реально подкреплена ликвидностью в стакане.',
-    'Очень низкое значение означает, что монета может выглядеть крупной по market cap, но торговаться как тонкий и легко манипулируемый рынок.',
+    'Он показывает, насколько капитализация реально подкреплена рыночной глубиной, а не только ценой на бумаге.',
+    'Очень низкое значение означает, что монета может выглядеть крупной по market cap, но иметь тонкую ликвидность даже по агрегированным данным CoinGecko.',
     '',
   ].join('\n');
 }
 
-BybitInstrument _selectInstrumentForTicker(
-  List<BybitInstrument> instruments,
-  String ticker,
+CoinGeckoMarketData? _selectCoinGeckoMarketData(
+  List<CoinGeckoMarketData> candidates,
+  String normalizedTicker,
 ) {
-  for (final instrument in instruments) {
-    if (instrument.symbol == '${ticker}USDT') {
-      return instrument;
-    }
+  final exactMatches = candidates
+      .where((candidate) => candidate.symbol == normalizedTicker)
+      .toList(growable: false);
+
+  if (exactMatches.isEmpty) {
+    return null;
   }
 
-  for (final instrument in instruments) {
-    if (instrument.symbol == '${ticker}PERP') {
-      return instrument;
-    }
-  }
+  exactMatches.sort((left, right) {
+    final leftCap = left.marketCap ?? 0;
+    final rightCap = right.marketCap ?? 0;
+    return rightCap.compareTo(leftCap);
+  });
 
-  return instruments.first;
+  return exactMatches.first;
 }
 
 String _buildAlertMessage({

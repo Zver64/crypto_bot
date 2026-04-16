@@ -1,144 +1,140 @@
-import '../models/bybit_instrument_models.dart';
-import '../models/bybit_models.dart';
-import '../models/bybit_orderbook_models.dart';
 import '../models/coin_analysis_models.dart';
+import '../models/coingecko_market_models.dart';
+import '../models/coingecko_ticker_models.dart';
 
 class CoinAnalysisService {
   static CoinAnalysisResult analyze({
-    required BybitTicker ticker,
-    required BybitInstrument instrument,
-    required BybitOrderbook orderbook,
-    required String generatedTicker,
-    required double marketCap,
-    double? athPrice,
+    required CoinGeckoMarketData marketData,
+    required List<CoinGeckoTicker> tickers,
     double? distanceFromAthPct,
   }) {
     final findings = <String>[];
     var riskScore = 0;
 
-    final turnover24h = double.tryParse(ticker.turnover24h ?? '');
-    final fundingRatePct = _parsePercentFromDecimal(ticker.fundingRate);
-    final nextFundingTime = _parseTimestamp(ticker.nextFundingTime);
+    final marketCap = marketData.marketCap ?? 0;
+    final volume24h = marketData.totalVolume;
+    final twoPercentDepthUsd = _calculateTwoPercentDepthUsd(tickers);
 
-    double? visibleDepthUsd;
-    double? visibleDepthToMarketCapRatio;
-    if (orderbook.bids.isNotEmpty && orderbook.asks.isNotEmpty) {
-      final bidDepthUsd = orderbook.bids.fold<double>(
-        0,
-        (sum, level) => sum + level.notionalUsd,
+    double? twoPercentDepthToMarketCapRatio;
+    if (twoPercentDepthUsd != null && marketCap > 0) {
+      twoPercentDepthToMarketCapRatio = twoPercentDepthUsd / marketCap;
+    }
+
+    double? volumeToMarketCapRatio;
+    if (volume24h != null && marketCap > 0) {
+      volumeToMarketCapRatio = volume24h / marketCap;
+    }
+
+    if (volumeToMarketCapRatio != null) {
+      riskScore += _scoreVolumeToMarketCap(volumeToMarketCapRatio, findings);
+    }
+
+    if (twoPercentDepthToMarketCapRatio != null) {
+      riskScore += _scoreDepthToMarketCap(
+        twoPercentDepthToMarketCapRatio,
+        findings,
       );
-      final askDepthUsd = orderbook.asks.fold<double>(
-        0,
-        (sum, level) => sum + level.notionalUsd,
-      );
-      visibleDepthUsd = bidDepthUsd < askDepthUsd ? bidDepthUsd : askDepthUsd;
-
-      if (marketCap > 0) {
-        visibleDepthToMarketCapRatio = visibleDepthUsd / marketCap;
-      }
+    } else {
+      findings.add('CoinGecko 2% market depth data is unavailable');
     }
 
-    double? turnoverToMarketCapRatio;
-    if (turnover24h != null && marketCap > 0) {
-      turnoverToMarketCapRatio = turnover24h / marketCap;
-    }
-
-    if (fundingRatePct != null) {
-      riskScore += _scoreFundingRate(fundingRatePct, findings);
-    }
-
-    if (turnoverToMarketCapRatio != null) {
-      riskScore += _scoreTurnoverToMarketCap(turnoverToMarketCapRatio, findings);
-    }
-
-    if (visibleDepthUsd != null &&
-        turnoverToMarketCapRatio != null &&
-        fundingRatePct != null) {
-      riskScore += _scoreLiquidityCrowdingCombo(
-        visibleDepthUsd: visibleDepthUsd,
-        marketCap: marketCap,
-        turnoverToMarketCapRatio: turnoverToMarketCapRatio,
-        fundingRatePct: fundingRatePct,
+    if (twoPercentDepthUsd != null &&
+        volume24h != null &&
+        volumeToMarketCapRatio != null) {
+      riskScore += _scoreLiquidityCrowding(
+        twoPercentDepthUsd: twoPercentDepthUsd,
+        volume24h: volume24h,
+        volumeToMarketCapRatio: volumeToMarketCapRatio,
         findings: findings,
       );
     }
 
     final boundedRiskScore = riskScore.clamp(0, 100);
     return CoinAnalysisResult(
-      symbol: ticker.symbol,
-      generatedTicker: generatedTicker,
+      name: marketData.name,
+      symbol: marketData.symbol,
       marketCap: marketCap,
       riskScore: boundedRiskScore,
       riskLevel: _resolveRiskLevel(boundedRiskScore),
       findings: findings.take(4).toList(growable: false),
-      visibleDepthUsd: visibleDepthUsd,
-      turnover24hUsd: turnover24h,
-      visibleDepthToMarketCapRatio: visibleDepthToMarketCapRatio,
-      turnoverToMarketCapRatio: turnoverToMarketCapRatio,
-      fundingRatePct: fundingRatePct,
-      fundingIntervalMinutes: instrument.fundingInterval,
-      nextFundingTime: nextFundingTime,
-      athPrice: athPrice,
+      twoPercentDepthUsd: twoPercentDepthUsd,
+      volume24hUsd: volume24h,
+      twoPercentDepthToMarketCapRatio: twoPercentDepthToMarketCapRatio,
+      volumeToMarketCapRatio: volumeToMarketCapRatio,
+      athPrice: marketData.ath,
       distanceFromAthPct: distanceFromAthPct,
     );
   }
 
-  static int _scoreTurnoverToMarketCap(double ratio, List<String> findings) {
+  static double? _calculateTwoPercentDepthUsd(List<CoinGeckoTicker> tickers) {
+    final usableTickers = tickers.where((ticker) => ticker.isUsableForDepth);
+    double totalDepth = 0;
+    var hasDepth = false;
+
+    for (final ticker in usableTickers) {
+      final conservativeDepth = ticker.conservativeDepthUsd;
+      if (conservativeDepth == null) {
+        continue;
+      }
+
+      totalDepth += conservativeDepth;
+      hasDepth = true;
+    }
+
+    return hasDepth ? totalDepth : null;
+  }
+
+  static int _scoreVolumeToMarketCap(double ratio, List<String> findings) {
     if (ratio >= 0.25) {
-      findings.add('24h turnover is extreme for this market cap');
+      findings.add('24h volume is extreme relative to market cap');
       return 18;
     }
     if (ratio >= 0.10) {
-      findings.add('24h turnover is high for this market cap');
+      findings.add('24h volume is high relative to market cap');
       return 10;
     }
     if (ratio >= 0.03) {
-      findings.add('24h turnover is elevated for this market cap');
+      findings.add('24h volume is elevated relative to market cap');
       return 5;
     }
     return 0;
   }
 
-  static int _scoreLiquidityCrowdingCombo({
-    required double visibleDepthUsd,
-    required double marketCap,
-    required double turnoverToMarketCapRatio,
-    required double fundingRatePct,
+  static int _scoreDepthToMarketCap(double ratio, List<String> findings) {
+    if (ratio < 0.0000025) {
+      findings.add('2% market depth is extremely thin for the market cap');
+      return 18;
+    }
+    if (ratio < 0.00001) {
+      findings.add('2% market depth is thin for the market cap');
+      return 10;
+    }
+    if (ratio < 0.00003) {
+      findings.add('2% market depth is modest relative to market cap');
+      return 5;
+    }
+    return 0;
+  }
+
+  static int _scoreLiquidityCrowding({
+    required double twoPercentDepthUsd,
+    required double volume24h,
+    required double volumeToMarketCapRatio,
     required List<String> findings,
   }) {
-    final visibleDepthToMarketCapRatio = marketCap > 0
-        ? visibleDepthUsd / marketCap
-        : 0;
-    final absFunding = fundingRatePct.abs();
+    if (volume24h <= 0) {
+      return 0;
+    }
 
-    if (visibleDepthToMarketCapRatio < 0.00001 &&
-        turnoverToMarketCapRatio >= 0.10 &&
-        absFunding >= 0.05) {
-      findings.add('Market cap looks weakly backed by visible liquidity');
-      return 18;
-    }
-    if (visibleDepthToMarketCapRatio < 0.00005 &&
-        turnoverToMarketCapRatio >= 0.03 &&
-        absFunding >= 0.02) {
-      findings.add('Visible liquidity looks weak for the market cap');
-      return 10;
-    }
-    return 0;
-  }
+    final depthToVolumeRatio = twoPercentDepthUsd / volume24h;
 
-  static int _scoreFundingRate(double fundingRatePct, List<String> findings) {
-    final absFunding = fundingRatePct.abs();
-    if (absFunding >= 0.15) {
-      findings.add('Funding is extreme');
-      return 18;
+    if (depthToVolumeRatio < 0.003 && volumeToMarketCapRatio >= 0.10) {
+      findings.add('Volume looks crowded versus available 2% market depth');
+      return 12;
     }
-    if (absFunding >= 0.05) {
-      findings.add('Funding is elevated');
-      return 10;
-    }
-    if (absFunding >= 0.02) {
-      findings.add('Funding is mildly elevated');
-      return 5;
+    if (depthToVolumeRatio < 0.01 && volumeToMarketCapRatio >= 0.03) {
+      findings.add('2% market depth looks light versus trading volume');
+      return 6;
     }
     return 0;
   }
@@ -151,23 +147,5 @@ class CoinAnalysisService {
       return CoinRiskLevel.medium;
     }
     return CoinRiskLevel.low;
-  }
-
-  static double? _parsePercentFromDecimal(String? rawValue) {
-    final parsed = double.tryParse(rawValue ?? '');
-    if (parsed == null) {
-      return null;
-    }
-
-    return parsed * 100;
-  }
-
-  static DateTime? _parseTimestamp(String? rawValue) {
-    final parsed = int.tryParse(rawValue ?? '');
-    if (parsed == null) {
-      return null;
-    }
-
-    return DateTime.fromMillisecondsSinceEpoch(parsed);
   }
 }

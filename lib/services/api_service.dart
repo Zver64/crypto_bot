@@ -4,6 +4,7 @@ import '../models/bybit_models.dart';
 import '../models/bybit_instrument_models.dart';
 import '../models/bybit_orderbook_models.dart';
 import '../models/coingecko_market_models.dart';
+import '../models/coingecko_ticker_models.dart';
 
 class RateLimitedException implements Exception {
   final String message;
@@ -78,7 +79,7 @@ class ApiService {
       final symbolsParam = symbols.join(',');
       final response = await _httpClient.get(
         Uri.parse(
-          'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=$symbolsParam',
+          'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=$symbolsParam&order=market_cap_desc&precision=full',
         ),
       );
 
@@ -106,6 +107,89 @@ class ApiService {
       return marketData;
     } catch (e) {
       print('ERROR: CoinGecko API call failed: $e');
+      rethrow;
+    }
+  }
+
+  static Future<List<CoinGeckoMarketData>> getCoinGeckoMarketDataBySymbol(
+    String symbol,
+  ) async {
+    final normalizedSymbol = symbol.trim().toLowerCase();
+    if (normalizedSymbol.isEmpty) {
+      return const <CoinGeckoMarketData>[];
+    }
+
+    try {
+      final response = await _httpClient.get(
+        Uri.parse(
+          'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&symbols=$normalizedSymbol&include_tokens=all&order=market_cap_desc&precision=full',
+        ),
+      );
+
+      if (response.statusCode == 429) {
+        throw RateLimitedException('CoinGecko error 429: ${response.body}');
+      }
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to fetch CoinGecko data for $symbol: ${response.statusCode}',
+        );
+      }
+
+      final data = json.decode(response.body) as List<dynamic>;
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(CoinGeckoMarketData.fromJson)
+          .toList(growable: false);
+    } catch (e) {
+      print('ERROR: CoinGecko symbol lookup failed for $symbol: $e');
+      rethrow;
+    }
+  }
+
+  static Future<List<CoinGeckoTicker>> getCoinGeckoCoinTickers(
+    String coinId, {
+    int maxPages = 3,
+  }) async {
+    final normalizedCoinId = coinId.trim();
+    if (normalizedCoinId.isEmpty) {
+      return const <CoinGeckoTicker>[];
+    }
+
+    final tickers = <CoinGeckoTicker>[];
+
+    try {
+      for (var page = 1; page <= maxPages; page++) {
+        final response = await _httpClient.get(
+          Uri.parse(
+            'https://api.coingecko.com/api/v3/coins/$normalizedCoinId/tickers?depth=true&order=volume_desc&page=$page',
+          ),
+        );
+
+        if (response.statusCode == 429) {
+          throw RateLimitedException('CoinGecko error 429: ${response.body}');
+        }
+        if (response.statusCode != 200) {
+          throw Exception(
+            'Failed to fetch CoinGecko tickers for $coinId: ${response.statusCode}',
+          );
+        }
+
+        final jsonData = json.decode(response.body) as Map<String, dynamic>;
+        final tickerList = (jsonData['tickers'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(CoinGeckoTicker.fromJson)
+            .toList(growable: false);
+
+        tickers.addAll(tickerList);
+
+        if (tickerList.length < 100) {
+          break;
+        }
+      }
+
+      return tickers;
+    } catch (e) {
+      print('ERROR: CoinGecko ticker lookup failed for $coinId: $e');
       rethrow;
     }
   }

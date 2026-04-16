@@ -17,7 +17,7 @@ void main() {
 
   group('analyzeCoin', () {
     test(
-      'returns the full BTC analysis message from mocked API responses',
+      'returns the full BTC analysis message from mocked CoinGecko responses',
       () async {
         ApiService.setHttpClient(buildBtcAnalyzeMockClient());
 
@@ -28,7 +28,7 @@ void main() {
     );
 
     test(
-      'returns the full SIREN analysis message from mocked API responses',
+      'returns the full SIREN analysis message from mocked CoinGecko responses',
       () async {
         ApiService.setHttpClient(buildSirenAnalyzeMockClient());
 
@@ -38,7 +38,7 @@ void main() {
       },
     );
 
-    test('normalizes multiplier contracts in the full analyze flow', () async {
+    test('selects the highest market cap CoinGecko match for a symbol', () async {
       ApiService.setHttpClient(buildPepeAnalyzeMockClient());
 
       final message = await analyzeCoin('pepe');

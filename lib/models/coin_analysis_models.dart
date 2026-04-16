@@ -8,36 +8,30 @@ class MarketSnapshot {
 }
 
 class CoinAnalysisResult {
+  final String name;
   final String symbol;
-  final String generatedTicker;
   final double marketCap;
   final int riskScore;
   final CoinRiskLevel riskLevel;
-  final double? visibleDepthUsd;
-  final double? turnover24hUsd;
-  final double? visibleDepthToMarketCapRatio;
-  final double? turnoverToMarketCapRatio;
-  final double? fundingRatePct;
-  final int? fundingIntervalMinutes;
-  final DateTime? nextFundingTime;
+  final double? twoPercentDepthUsd;
+  final double? volume24hUsd;
+  final double? twoPercentDepthToMarketCapRatio;
+  final double? volumeToMarketCapRatio;
   final double? athPrice;
   final double? distanceFromAthPct;
   final List<String> findings;
 
   const CoinAnalysisResult({
+    required this.name,
     required this.symbol,
-    required this.generatedTicker,
     required this.marketCap,
     required this.riskScore,
     required this.riskLevel,
     required this.findings,
-    this.visibleDepthUsd,
-    this.turnover24hUsd,
-    this.visibleDepthToMarketCapRatio,
-    this.turnoverToMarketCapRatio,
-    this.fundingRatePct,
-    this.fundingIntervalMinutes,
-    this.nextFundingTime,
+    this.twoPercentDepthUsd,
+    this.volume24hUsd,
+    this.twoPercentDepthToMarketCapRatio,
+    this.volumeToMarketCapRatio,
     this.athPrice,
     this.distanceFromAthPct,
   });
