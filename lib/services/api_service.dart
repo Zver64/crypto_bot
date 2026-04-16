@@ -146,6 +146,43 @@ class ApiService {
     }
   }
 
+  static Future<CoinGeckoMarketData?> getCoinGeckoMarketDataById(
+    String coinId,
+  ) async {
+    final normalizedCoinId = coinId.trim();
+    if (normalizedCoinId.isEmpty) {
+      return null;
+    }
+
+    try {
+      final response = await _httpClient.get(
+        Uri.parse(
+          'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=$normalizedCoinId&precision=full',
+        ),
+      );
+
+      if (response.statusCode == 429) {
+        throw RateLimitedException('CoinGecko error 429: ${response.body}');
+      }
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to fetch CoinGecko data for $coinId: ${response.statusCode}',
+        );
+      }
+
+      final data = json.decode(response.body) as List<dynamic>;
+      final firstMatch = data.whereType<Map<String, dynamic>>().firstOrNull;
+      if (firstMatch == null) {
+        return null;
+      }
+
+      return CoinGeckoMarketData.fromJson(firstMatch);
+    } catch (e) {
+      print('ERROR: CoinGecko id lookup failed for $coinId: $e');
+      rethrow;
+    }
+  }
+
   static Future<List<CoinGeckoTicker>> getCoinGeckoCoinTickers(
     String coinId, {
     int maxPages = 3,

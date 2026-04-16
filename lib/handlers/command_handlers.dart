@@ -43,6 +43,23 @@ Future<void> setupCommands(Bot bot) async {
     await ctx.conversation.enter('analyze');
   });
 
+  bot.callbackQuery(RegExp(r'^analyze:'), (ctx) async {
+    final callbackData = ctx.callbackQuery?.data ?? '';
+    final coinId = callbackData.replaceFirst('analyze:', '').trim();
+
+    if (coinId.isEmpty) {
+      await ctx.answerCallbackQuery(
+        text: 'Could not determine the selected coin.',
+        showAlert: true,
+      );
+      return;
+    }
+
+    await ctx.answerCallbackQuery(text: 'Analyzing $coinId...');
+    final message = await analyzeCoinById(coinId);
+    await ctx.editMessageText(message, parseMode: ParseMode.html);
+  });
+
   bot.command('faq', (ctx) {
     ctx.reply(getAnalyzeFaqMessage(), parseMode: ParseMode.html);
   });

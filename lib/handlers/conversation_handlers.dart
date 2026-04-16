@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:televerse/televerse.dart';
 import 'package:televerse/telegram.dart';
 import 'package:televerse/plugins/conversation.dart';
+import '../models/coingecko_market_models.dart';
 import '../services/bot_state.dart';
 import '../services/price_service.dart';
 import '../utils/common.dart';
@@ -121,6 +122,48 @@ Future<void> analyzeCoinHandler(Conversation conversation, Context ctx) async {
   );
 
   final ticker = (symbolResponse.text ?? '').trim().toUpperCase();
-  final message = await analyzeCoin(ticker);
-  await symbolResponse.reply(message, parseMode: ParseMode.html);
+  final selection = await getAnalyzeCoinSelection(ticker);
+
+  if (selection.requestedTicker.isEmpty) {
+    await symbolResponse.reply('Send a valid coin ticker.');
+    return;
+  }
+
+  if (selection.candidates.isEmpty) {
+    await symbolResponse.reply(
+      'No CoinGecko market data match for ${selection.requestedTicker}.',
+    );
+    return;
+  }
+
+  if (selection.hasSingleCandidate) {
+    final message = await analyzeCoinById(selection.candidates.first.id);
+    await symbolResponse.reply(message, parseMode: ParseMode.html);
+    return;
+  }
+
+  await symbolResponse.reply(
+    'Multiple CoinGecko matches found for ${selection.requestedTicker}. Choose by symbol, name, price, and market cap:',
+    replyMarkup: InlineKeyboardMarkup(
+      inlineKeyboard: selection.candidates
+          .map((candidate) => <InlineKeyboardButton>[
+                InlineKeyboardButton(
+                  text: _buildAnalyzeCoinOptionLabel(candidate),
+                  callbackData: 'analyze:${candidate.id}',
+                ),
+              ])
+          .toList(growable: false),
+    ),
+  );
+}
+
+String _buildAnalyzeCoinOptionLabel(CoinGeckoMarketData candidate) {
+  final priceLabel = candidate.currentPrice == null
+      ? 'price n/a'
+      : 'price ${formatUsdPrice(candidate.currentPrice!)}';
+  final marketCapLabel = candidate.marketCap == null || candidate.marketCap! <= 0
+      ? 'mcap n/a'
+      : 'mcap ${formatCompactUsd(candidate.marketCap!)}';
+
+  return '${candidate.symbol} - ${candidate.name} | $priceLabel | $marketCapLabel';
 }

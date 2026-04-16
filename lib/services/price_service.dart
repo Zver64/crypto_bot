@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:televerse/televerse.dart';
 import 'package:televerse/telegram.dart';
 import '../models/coingecko_market_models.dart';
@@ -8,6 +10,18 @@ import '../services/batch_processor.dart';
 import '../services/coin_analysis_service.dart';
 import '../utils/common.dart';
 import '../config/app_config.dart';
+
+class AnalyzeCoinSelection {
+  final String requestedTicker;
+  final List<CoinGeckoMarketData> candidates;
+
+  const AnalyzeCoinSelection({
+    required this.requestedTicker,
+    required this.candidates,
+  });
+
+  bool get hasSingleCandidate => candidates.length == 1;
+}
 
 Future<void> checkPrices(
   Bot bot,
@@ -235,33 +249,68 @@ double? calculateDistanceFromAthPct(double currentPrice, double? athPrice) {
 }
 
 Future<String> analyzeCoin(String rawTicker) async {
+  try {
+    final selection = await getAnalyzeCoinSelection(rawTicker);
+    if (selection.candidates.isEmpty) {
+      return 'No CoinGecko market data match for ${selection.requestedTicker}.';
+    }
+
+    if (!selection.hasSingleCandidate) {
+      return 'Multiple CoinGecko matches found for ${selection.requestedTicker}.';
+    }
+
+    return analyzeCoinById(selection.candidates.first.id);
+  } on RateLimitedException catch (e) {
+    return e.message;
+  }
+}
+
+Future<AnalyzeCoinSelection> getAnalyzeCoinSelection(String rawTicker) async {
   final normalizedTicker = rawTicker.trim().toUpperCase();
   if (normalizedTicker.isEmpty) {
-    return 'Send a valid coin ticker.';
+    return const AnalyzeCoinSelection(
+      requestedTicker: '',
+      candidates: <CoinGeckoMarketData>[],
+    );
+  }
+
+  final marketCandidates = await ApiService.getCoinGeckoMarketDataBySymbol(
+    normalizedTicker,
+  );
+  final exactMatches = _selectCoinGeckoMarketDataCandidates(
+    marketCandidates,
+    normalizedTicker,
+  );
+
+  return AnalyzeCoinSelection(
+    requestedTicker: normalizedTicker,
+    candidates: exactMatches,
+  );
+}
+
+Future<String> analyzeCoinById(String coinId) async {
+  final normalizedCoinId = coinId.trim();
+  if (normalizedCoinId.isEmpty) {
+    return 'Send a valid CoinGecko coin id.';
   }
 
   try {
-    final marketCandidates = await ApiService.getCoinGeckoMarketDataBySymbol(
-      normalizedTicker,
-    );
-    final marketData = _selectCoinGeckoMarketData(
-      marketCandidates,
-      normalizedTicker,
+    final marketData = await ApiService.getCoinGeckoMarketDataById(
+      normalizedCoinId,
     );
 
     if (marketData == null) {
-      return 'No CoinGecko market data match for $normalizedTicker.';
+      return 'No CoinGecko market data match for $normalizedCoinId.';
     }
 
     final marketCap = marketData.marketCap;
-
     if (marketCap == null || marketCap <= 0) {
-      return 'No CoinGecko market cap match for $normalizedTicker.';
+      return 'No CoinGecko market cap match for ${marketData.symbol}.';
     }
 
     final currentPrice = marketData.currentPrice;
     if (currentPrice == null || currentPrice <= 0) {
-      return 'Could not parse CoinGecko price for $normalizedTicker.';
+      return 'Could not parse CoinGecko price for ${marketData.symbol}.';
     }
 
     final distanceFromAthPct = calculateDistanceFromAthPct(
@@ -281,9 +330,10 @@ Future<String> analyzeCoin(String rawTicker) async {
       CoinRiskLevel.medium => 'MEDIUM',
       CoinRiskLevel.high => 'HIGH',
     };
+    final escapedName = const HtmlEscape().convert(analysis.name);
 
     return [
-      '<b>${analysis.name}</b> (${analysis.symbol})',
+      '<b>$escapedName</b> (${analysis.symbol})',
       '<b>Risk:</b> $riskLabel (${analysis.riskScore}/100)',
       '<b>Price:</b> ${formatUsdPrice(currentPrice)}',
       '<b>Market Cap:</b> ${formatCompactUsd(analysis.marketCap)}',
@@ -331,25 +381,14 @@ String getAnalyzeFaqMessage() {
   ].join('\n');
 }
 
-CoinGeckoMarketData? _selectCoinGeckoMarketData(
+List<CoinGeckoMarketData> _selectCoinGeckoMarketDataCandidates(
   List<CoinGeckoMarketData> candidates,
   String normalizedTicker,
 ) {
   final exactMatches = candidates
       .where((candidate) => candidate.symbol == normalizedTicker)
       .toList(growable: false);
-
-  if (exactMatches.isEmpty) {
-    return null;
-  }
-
-  exactMatches.sort((left, right) {
-    final leftCap = left.marketCap ?? 0;
-    final rightCap = right.marketCap ?? 0;
-    return rightCap.compareTo(leftCap);
-  });
-
-  return exactMatches.first;
+  return exactMatches;
 }
 
 String _buildAlertMessage({
