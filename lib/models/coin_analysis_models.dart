@@ -1,4 +1,6 @@
-enum CoinRiskLevel { low, medium, high }
+enum ExplosiveUpsideLevel { low, medium, high, extreme }
+
+enum DataConfidenceLevel { low, medium, high }
 
 class MarketSnapshot {
   final double openInterest;
@@ -11,27 +13,41 @@ class CoinAnalysisResult {
   final String name;
   final String symbol;
   final double marketCap;
-  final int riskScore;
-  final CoinRiskLevel riskLevel;
-  final double? twoPercentDepthUsd;
+  final int explosiveUpsideScore;
+  final ExplosiveUpsideLevel explosiveUpsideLevel;
+  final int dataConfidenceScore;
+  final DataConfidenceLevel dataConfidenceLevel;
+  final double? upsideDepthUsd;
+  final double? downsideDepthUsd;
   final double? volume24hUsd;
-  final double? twoPercentDepthToMarketCapRatio;
-  final double? volumeToMarketCapRatio;
+  final double? upsideDepthToMarketCapRatio;
+  final double? upsideDepthToVolumeRatio;
+  final double? topVenueVolumeShare;
+  final double? topVenueUpsideDepthShare;
+  final double? usableTickerCoverageRatio;
   final double? athPrice;
   final double? distanceFromAthPct;
   final List<String> findings;
+  final List<String> constraints;
 
   const CoinAnalysisResult({
     required this.name,
     required this.symbol,
     required this.marketCap,
-    required this.riskScore,
-    required this.riskLevel,
+    required this.explosiveUpsideScore,
+    required this.explosiveUpsideLevel,
+    required this.dataConfidenceScore,
+    required this.dataConfidenceLevel,
     required this.findings,
-    this.twoPercentDepthUsd,
+    required this.constraints,
+    this.upsideDepthUsd,
+    this.downsideDepthUsd,
     this.volume24hUsd,
-    this.twoPercentDepthToMarketCapRatio,
-    this.volumeToMarketCapRatio,
+    this.upsideDepthToMarketCapRatio,
+    this.upsideDepthToVolumeRatio,
+    this.topVenueVolumeShare,
+    this.topVenueUpsideDepthShare,
+    this.usableTickerCoverageRatio,
     this.athPrice,
     this.distanceFromAthPct,
   });

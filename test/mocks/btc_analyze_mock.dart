@@ -11,6 +11,11 @@ MockClient buildBtcAnalyzeMockClient() {
     }
 
     if (url ==
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin&precision=full') {
+      return http.Response(_btcCoinGeckoResponseJson, 200);
+    }
+
+    if (url ==
         'https://api.coingecko.com/api/v3/coins/bitcoin/tickers?depth=true&order=volume_desc&page=1') {
       return http.Response(_btcTickersResponseJson, 200);
     }
@@ -21,14 +26,20 @@ MockClient buildBtcAnalyzeMockClient() {
 
 const String btcExpectedAnalyzeMessage =
     '<b>Bitcoin</b> (BTC)\n'
-    '<b>Risk:</b> LOW (5/100)\n'
+    '<b>Explosive Upside Potential:</b> LOW (0/100)\n'
+    '<b>Data Confidence:</b> MEDIUM (71/100)\n'
     '<b>Price:</b> \$71.26K\n'
     '<b>Market Cap:</b> \$1425.41B\n'
     '<b>ATH:</b> \$126.08K\n'
     '<b>Distance from ATH:</b> -43.48%\n'
     '<b>24h Volume:</b> \$40.56B\n'
-    '<b>2% Market Depth:</b> \$25.36M\n'
-    '<b>2% Depth vs Market Cap:</b> 0.00178%';
+    '<b>Upward 2% Depth:</b> \$29.32M\n'
+    '<b>Upward Depth vs Market Cap:</b> 0.00206%\n'
+    '<b>Upward Depth vs 24h Volume:</b> 0.0723%\n'
+    '<b>Top Venue Volume Share:</b> 71.9%\n'
+    '<b>Top Venue Upward Depth Share:</b> 65.9%\n'
+    '<b>Pump Drivers:</b> No strong CoinGecko depth signals of an easy upside squeeze\n'
+    '<b>Constraints:</b> Upward depth is substantial enough to resist a small squeeze; CoinGecko depth does not show upside asymmetry; Visible CoinGecko venue volume covers only a small slice of 24h volume';
 
 const String _btcCoinGeckoResponseJson =
     r'''[{"id":"bitcoin","symbol":"btc","name":"Bitcoin","current_price":71259,"market_cap":1425408987537,"total_volume":40560127061,"ath":126080,"ath_change_percentage":-43.48077}]''';

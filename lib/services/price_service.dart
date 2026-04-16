@@ -325,23 +325,35 @@ Future<String> analyzeCoinById(String coinId) async {
       distanceFromAthPct: distanceFromAthPct,
     );
 
-    final riskLabel = switch (analysis.riskLevel) {
-      CoinRiskLevel.low => 'LOW',
-      CoinRiskLevel.medium => 'MEDIUM',
-      CoinRiskLevel.high => 'HIGH',
+    final explosiveUpsideLabel = switch (analysis.explosiveUpsideLevel) {
+      ExplosiveUpsideLevel.low => 'LOW',
+      ExplosiveUpsideLevel.medium => 'MEDIUM',
+      ExplosiveUpsideLevel.high => 'HIGH',
+      ExplosiveUpsideLevel.extreme => 'EXTREME',
+    };
+    final dataConfidenceLabel = switch (analysis.dataConfidenceLevel) {
+      DataConfidenceLevel.low => 'LOW',
+      DataConfidenceLevel.medium => 'MEDIUM',
+      DataConfidenceLevel.high => 'HIGH',
     };
     final escapedName = const HtmlEscape().convert(analysis.name);
 
     return [
       '<b>$escapedName</b> (${analysis.symbol})',
-      '<b>Risk:</b> $riskLabel (${analysis.riskScore}/100)',
+      '<b>Explosive Upside Potential:</b> $explosiveUpsideLabel (${analysis.explosiveUpsideScore}/100)',
+      '<b>Data Confidence:</b> $dataConfidenceLabel (${analysis.dataConfidenceScore}/100)',
       '<b>Price:</b> ${formatUsdPrice(currentPrice)}',
       '<b>Market Cap:</b> ${formatCompactUsd(analysis.marketCap)}',
       '<b>ATH:</b> ${analysis.athPrice == null ? 'n/a' : formatUsdPrice(analysis.athPrice!)}',
       '<b>Distance from ATH:</b> ${formatPercentValue(analysis.distanceFromAthPct)}',
       '<b>24h Volume:</b> ${analysis.volume24hUsd == null ? 'n/a' : formatCompactUsd(analysis.volume24hUsd!)}',
-      '<b>2% Market Depth:</b> ${analysis.twoPercentDepthUsd == null ? 'n/a' : formatCompactUsd(analysis.twoPercentDepthUsd!)}',
-      '<b>2% Depth vs Market Cap:</b> ${formatRatioAsPercent(analysis.twoPercentDepthToMarketCapRatio)}',
+      '<b>Upward 2% Depth:</b> ${analysis.upsideDepthUsd == null ? 'n/a' : formatCompactUsd(analysis.upsideDepthUsd!)}',
+      '<b>Upward Depth vs Market Cap:</b> ${formatRatioAsPercent(analysis.upsideDepthToMarketCapRatio)}',
+      '<b>Upward Depth vs 24h Volume:</b> ${formatRatioAsPercent(analysis.upsideDepthToVolumeRatio)}',
+      '<b>Top Venue Volume Share:</b> ${formatRatioAsPercent(analysis.topVenueVolumeShare)}',
+      '<b>Top Venue Upward Depth Share:</b> ${formatRatioAsPercent(analysis.topVenueUpsideDepthShare)}',
+      '<b>Pump Drivers:</b> ${analysis.findings.join('; ')}',
+      '<b>Constraints:</b> ${analysis.constraints.join('; ')}',
     ].join('\n');
   } on RateLimitedException catch (e) {
     return e.message;
@@ -352,31 +364,50 @@ String getAnalyzeFaqMessage() {
   return [
     '<b>Как читать /analyze</b>',
     '',
-    '<b>Risk</b>:',
-    'LOW означает, что рынок сейчас не выглядит явно подозрительным по ключевым признакам.',
-    'MEDIUM означает, что структура уже слабая и входить нужно осторожно.',
-    'HIGH означает, что монета выглядит опасной для авто-шорта и легко двигаемой.',
+    '<b>Explosive Upside Potential</b>:',
+    'Это оценка того, насколько монета структурно пригодна для резкого неестественного роста вверх.',
+    'LOW означает, что по данным CoinGecko рынок не выглядит легко пампуемым.',
+    'MEDIUM означает, что отдельные сигналы хрупкости уже есть.',
+    'HIGH и EXTREME означают, что вверх цену потенциально можно сдвигать заметно легче, чем кажется по market cap.',
+    'Больше = хуже с точки зрения риска пампа вверх.',
+    '',
+    '<b>Data Confidence</b>:',
+    'Это оценка качества входных данных CoinGecko.',
+    'Если confidence низкий, вывод по pump potential нужно трактовать осторожно, потому что usable ticker/depth данных мало.',
+    'Больше = лучше, потому что вывод надёжнее.',
     '',
     '<b>Market Cap</b>:',
     'Это капитализация на бумаге. Сама по себе она не доказывает, что рынок монеты реально глубокий и устойчивый.',
+    'При прочих равных меньше = хуже, потому что маленькую капитализацию легче разгонять.',
     '',
     '<b>ATH</b>:',
     'Исторический максимум цены. Нужен как контекст, чтобы понимать, насколько монета далеко от прошлой эйфории.',
+    'Это просто ориентир, не good/bad метрика сама по себе.',
     '',
     '<b>Distance from ATH</b>:',
     'Показывает, на сколько процентов текущая цена ниже исторического максимума.',
+    'Сильнее ниже ATH = выше пространство для рефлексивного роста, но это слабый вспомогательный сигнал.',
     '',
     '<b>24h Volume</b>:',
     'Это агрегированный объём торгов за 24 часа по данным CoinGecko.',
+    'Сам по себе объём не good/bad: его нужно читать только вместе с глубиной.',
     '',
-    '<b>2% Market Depth</b>:',
-    'Это консервативная оценка глубины из CoinGecko ticker depth.',
-    'Она считается по cost_to_move_up_usd и cost_to_move_down_usd и показывает, сколько USD нужно, чтобы сдвинуть цену примерно на 2%.',
+    '<b>Upward 2% Depth</b>:',
+    'Это оценка того, сколько USD нужно, чтобы сдвинуть цену вверх примерно на 2% по usable CoinGecko venues.',
+    'Меньше = хуже, потому что цену легче толкнуть вверх.',
     '',
-    '<b>2% Depth vs Market Cap</b>:',
-    'Главный показатель для этой проверки.',
-    'Он показывает, насколько капитализация реально подкреплена рыночной глубиной, а не только ценой на бумаге.',
-    'Очень низкое значение означает, что монета может выглядеть крупной по market cap, но иметь тонкую ликвидность даже по агрегированным данным CoinGecko.',
+    '<b>Upward Depth vs Market Cap</b>:',
+    'Показывает, насколько рыночная капитализация подкреплена реальной глубиной именно на движении вверх.',
+    'Меньше = хуже, потому что market cap слабее подкреплён реальной ликвидностью.',
+    '',
+    '<b>Upward Depth vs 24h Volume</b>:',
+    'Показывает, насколько текущий торговый поток уже велик относительно глубины, которую нужно пройти для дальнейшего роста.',
+    'Меньше = хуже, потому что текущий поток сильнее давит на тонкий рынок.',
+    '',
+    '<b>Top Venue Volume Share / Top Venue Upward Depth Share</b>:',
+    'Показывают, насколько объём и глубина сконцентрированы на одной площадке.',
+    'Чем выше концентрация, тем легче локально сделать сильное движение, не имея широкого рыночного участия.',
+    'Больше = хуже, потому что рынок менее распределён.',
     '',
   ].join('\n');
 }
@@ -388,7 +419,18 @@ List<CoinGeckoMarketData> _selectCoinGeckoMarketDataCandidates(
   final exactMatches = candidates
       .where((candidate) => candidate.symbol == normalizedTicker)
       .toList(growable: false);
-  return exactMatches;
+
+  if (exactMatches.length <= 1) {
+    return exactMatches;
+  }
+
+  exactMatches.sort((left, right) {
+    final leftMarketCap = left.marketCap ?? 0;
+    final rightMarketCap = right.marketCap ?? 0;
+    return rightMarketCap.compareTo(leftMarketCap);
+  });
+
+  return <CoinGeckoMarketData>[exactMatches.first];
 }
 
 String _buildAlertMessage({
