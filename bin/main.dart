@@ -26,6 +26,7 @@ void main() async {
   bot.use(
     createConversation(ConversationNames.threshold.name, setThresholdHandler),
   );
+  bot.use(createConversation(ConversationNames.mcap.name, setMarketCapHandler));
   bot.use(
     createConversation(ConversationNames.analyze.name, analyzeCoinHandler),
   );

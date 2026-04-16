@@ -119,7 +119,9 @@ Future<void> checkPrices(
 
         final double dynamicThreshold = volatilityFromMcap(
           marketCap,
+          smallMcap: threshold.minMarketCap,
           smallVol: threshold.minCap.toDouble(),
+          largeMcap: threshold.maxMarketCap,
           largeVol: threshold.maxCap.toDouble(),
         );
 

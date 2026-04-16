@@ -31,6 +31,10 @@ Future<void> setupCommands(Bot bot) async {
     await ctx.conversation.enter('threshold');
   });
 
+  bot.command('setmcap', (ctx) async {
+    await ctx.conversation.enter('mcap');
+  });
+
   bot.command('status', (ctx) {
     ctx.reply(SubscriptionService.getStatus());
   });
@@ -56,6 +60,7 @@ Future<void> setCommandsAPI(Bot bot) async {
       command: 'setthreshold',
       description: 'Установить порог уведомлений',
     ),
+    BotCommand(command: 'setmcap', description: 'Установить cap anchors'),
     BotCommand(command: 'status', description: 'Показать текущие настройки'),
     BotCommand(command: 'analyze', description: 'Анализ монеты'),
     BotCommand(command: 'faq', description: 'Как читать анализ'),

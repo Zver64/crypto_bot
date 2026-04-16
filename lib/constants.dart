@@ -1,1 +1,1 @@
-enum ConversationNames { threshold, analyze }
+enum ConversationNames { threshold, mcap, analyze }
