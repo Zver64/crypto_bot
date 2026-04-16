@@ -1,6 +1,7 @@
 import 'package:televerse/televerse.dart';
 import 'package:televerse/telegram.dart';
 import '../models/bybit_instrument_models.dart';
+import '../models/coingecko_market_models.dart';
 import '../models/coin_analysis_models.dart';
 import '../services/bot_state.dart';
 import '../services/api_service.dart';
@@ -43,12 +44,13 @@ Future<void> checkPrices(
         BotState.generatedTickerCache[symbol] = generateTickerFromBaseCoin(
           instrument.baseCoin,
         );
+        BotState.baseCoinCache[symbol] = instrument.baseCoin;
       }
     }
 
     final missingSymbols = filteredCoinList
         .map((ticker) => ticker.symbol)
-        .where((symbol) => !BotState.circulatingSupplyCache.containsKey(symbol))
+        .where((symbol) => !BotState.marketCapCache.containsKey(symbol))
         .toList();
 
     final missingGeneratedTickers = missingSymbols
@@ -59,61 +61,61 @@ Future<void> checkPrices(
 
     if (missingGeneratedTickers.isNotEmpty) {
       print(
-        'Fetching circulating supplies for ${missingGeneratedTickers.length} missing coins',
+        'Fetching CoinGecko market data for ${missingGeneratedTickers.length} missing coins',
       );
       try {
-        final supplyResults =
-            await BatchProcessor.batchProcess<Map<String, BigInt>, String>(
+        final marketDataResults =
+            await BatchProcessor.batchProcess<
+              Map<String, CoinGeckoMarketData>,
+              String
+            >(
               missingGeneratedTickers,
-              ApiService.getCoinGeckoCirculatingSupply,
+              ApiService.getCoinGeckoMarketData,
               delay: Config.batchProcessDelay,
             );
 
-        final mergedSupplies = <String, BigInt>{};
-        for (final supplies in supplyResults) {
-          mergedSupplies.addAll(supplies);
+        final mergedMarketData = <String, CoinGeckoMarketData>{};
+        for (final marketData in marketDataResults) {
+          mergedMarketData.addAll(marketData);
         }
 
         for (final symbol in missingSymbols) {
           final generatedTicker = BotState.generatedTickerCache[symbol];
           if (generatedTicker == null) continue;
-          final circulatingSupply = mergedSupplies[generatedTicker];
-          if (circulatingSupply != null) {
-            BotState.circulatingSupplyCache[symbol] = circulatingSupply;
+          final marketCap = mergedMarketData[generatedTicker]?.marketCap;
+          if (marketCap != null && marketCap > 0) {
+            BotState.marketCapCache[symbol] = marketCap;
           }
         }
 
         final notFoundSymbols = missingSymbols
-            .where(
-              (symbol) => !BotState.circulatingSupplyCache.containsKey(symbol),
-            )
+            .where((symbol) => !BotState.marketCapCache.containsKey(symbol))
             .toList();
         if (notFoundSymbols.isNotEmpty) {
-          print('No CoinGecko supply match for: $notFoundSymbols');
+          print('No CoinGecko market cap match for: $notFoundSymbols');
         }
 
         print(
-          'Total circulating supplies cached: ${BotState.circulatingSupplyCache.length}',
+          'Total CoinGecko market caps cached: ${BotState.marketCapCache.length}',
         );
       } catch (e) {
-        print('ERROR: CoinGecko supply lookup failed: $e');
-        alerts.add('⚠️ CoinGecko supply lookup failed for some filtered coins');
+        print('ERROR: CoinGecko market data lookup failed: $e');
+        alerts.add(
+          '⚠️ CoinGecko market data lookup failed for some filtered coins',
+        );
       }
     }
 
     for (final ticker in filteredCoinList) {
       final double change24h = double.parse(ticker.price24hPcnt) * 100;
-      final BigInt? circulatingSupply =
-          BotState.circulatingSupplyCache[ticker.symbol];
+      final double? marketCap = BotState.marketCapCache[ticker.symbol];
 
-      if (circulatingSupply != null && circulatingSupply > BigInt.zero) {
+      if (marketCap != null && marketCap > 0) {
         final double currentPrice = double.parse(ticker.lastPrice);
-        // Scale price by 1e12 to preserve full double precision
-        final BigInt scaledPrice = BigInt.from((currentPrice * 1e12).round());
-        final BigInt scaledMarketCap = circulatingSupply * scaledPrice;
-        final BigInt marketCapBigInt =
-            scaledMarketCap ~/ BigInt.from(1e12.toInt());
-        final double marketCap = marketCapBigInt.toDouble();
+        final baseCoin = BotState.baseCoinCache[ticker.symbol];
+        final displayPrice = baseCoin == null
+            ? currentPrice
+            : normalizeContractPrice(currentPrice, baseCoin);
 
         final double dynamicThreshold = volatilityFromMcap(
           marketCap,
@@ -129,7 +131,7 @@ Future<void> checkPrices(
               _buildAlertMessage(
                 symbol: ticker.symbol,
                 change24h: change24h,
-                currentPrice: currentPrice,
+                currentPrice: displayPrice,
                 threshold: dynamicThreshold,
                 marketCap: marketCap,
               ),
@@ -223,16 +225,6 @@ double normalizeContractPrice(double contractPrice, String baseCoin) {
   return contractPrice / extractBaseCoinMultiplier(baseCoin);
 }
 
-double calculateMarketCapFromSupply({
-  required BigInt circulatingSupply,
-  required double underlyingPrice,
-}) {
-  final scaledPrice = BigInt.from((underlyingPrice * 1e12).round());
-  final scaledMarketCap = circulatingSupply * scaledPrice;
-  final marketCapBigInt = scaledMarketCap ~/ BigInt.from(1e12.toInt());
-  return marketCapBigInt.toDouble();
-}
-
 double? calculateDistanceFromAthPct(double currentPrice, double? athPrice) {
   if (athPrice == null || athPrice <= 0) {
     return null;
@@ -260,7 +252,9 @@ Future<String> analyzeCoin(String rawTicker) async {
     );
     final normalizedSymbol = instrument.symbol;
 
-    final bybitTicker = await ApiService.getBybitTickerBySymbol(normalizedSymbol);
+    final bybitTicker = await ApiService.getBybitTickerBySymbol(
+      normalizedSymbol,
+    );
     if (bybitTicker == null) {
       return 'Symbol $normalizedSymbol was not found on Bybit linear futures.';
     }
@@ -275,13 +269,14 @@ Future<String> analyzeCoin(String rawTicker) async {
       generatedTicker,
     ]);
     final coinGeckoMarketData = marketData[generatedTicker.toUpperCase()];
-    final circulatingSupply = coinGeckoMarketData?.circulatingSupply;
+    final marketCap = coinGeckoMarketData?.marketCap;
 
-    if (circulatingSupply == null || circulatingSupply <= BigInt.zero) {
-      return 'No CoinGecko supply match for $normalizedSymbol.';
+    if (marketCap == null || marketCap <= 0) {
+      return 'No CoinGecko market cap match for $normalizedSymbol.';
     }
 
-    BotState.circulatingSupplyCache[normalizedSymbol] = circulatingSupply;
+    BotState.baseCoinCache[normalizedSymbol] = instrument.baseCoin;
+    BotState.marketCapCache[normalizedSymbol] = marketCap;
 
     final currentPrice = double.tryParse(bybitTicker.lastPrice);
     if (currentPrice == null) {
@@ -291,10 +286,6 @@ Future<String> analyzeCoin(String rawTicker) async {
     final normalizedPrice = normalizeContractPrice(
       currentPrice,
       instrument.baseCoin,
-    );
-    final marketCap = calculateMarketCapFromSupply(
-      circulatingSupply: circulatingSupply,
-      underlyingPrice: normalizedPrice,
     );
     final distanceFromAthPct = calculateDistanceFromAthPct(
       normalizedPrice,
@@ -333,14 +324,21 @@ Future<String> analyzeCoin(String rawTicker) async {
   }
 }
 
-Future<List<BybitInstrument>> _findAnalyzeInstruments(String normalizedTicker) async {
-  for (final candidateBaseCoin in _buildAnalyzeBaseCoinCandidates(normalizedTicker)) {
+Future<List<BybitInstrument>> _findAnalyzeInstruments(
+  String normalizedTicker,
+) async {
+  for (final candidateBaseCoin in _buildAnalyzeBaseCoinCandidates(
+    normalizedTicker,
+  )) {
     final instruments = await ApiService.getBybitLinearInstrumentsByBaseCoin(
       candidateBaseCoin,
     );
-    final matchingInstruments = instruments.where((instrument) {
-      return generateTickerFromBaseCoin(instrument.baseCoin) == normalizedTicker;
-    }).toList(growable: false);
+    final matchingInstruments = instruments
+        .where((instrument) {
+          return generateTickerFromBaseCoin(instrument.baseCoin) ==
+              normalizedTicker;
+        })
+        .toList(growable: false);
 
     if (matchingInstruments.isNotEmpty) {
       return matchingInstruments;

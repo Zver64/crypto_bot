@@ -69,21 +69,6 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, BigInt>> getCoinGeckoCirculatingSupply(
-    List<String> symbols,
-  ) async {
-    final marketData = await getCoinGeckoMarketData(symbols);
-    final circulatingSupplies = <String, BigInt>{};
-    for (final entry in marketData.entries) {
-      final supply = entry.value.circulatingSupply;
-      if (supply != null) {
-        circulatingSupplies[entry.key] = supply;
-      }
-    }
-
-    return circulatingSupplies;
-  }
-
   static Future<Map<String, CoinGeckoMarketData>> getCoinGeckoMarketData(
     List<String> symbols,
   ) async {
@@ -98,9 +83,7 @@ class ApiService {
       );
 
       if (response.statusCode == 429) {
-        throw RateLimitedException(
-          'CoinGecko error 429: ${response.body}',
-        );
+        throw RateLimitedException('CoinGecko error 429: ${response.body}');
       }
       if (response.statusCode != 200) {
         throw Exception(

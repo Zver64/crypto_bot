@@ -65,10 +65,11 @@ class SubscriptionService {
   }
 
   static Future<void> _refreshCache() async {
-    print('Resetting circulating supply cache...');
+    print('Resetting coin metadata cache...');
     BotState.generatedTickerCache.clear();
-    BotState.circulatingSupplyCache.clear();
-    print('Cache reset: ${BotState.circulatingSupplyCache.length} coins');
+    BotState.baseCoinCache.clear();
+    BotState.marketCapCache.clear();
+    print('Cache reset: ${BotState.marketCapCache.length} coins');
   }
 
   static String getStatus() {
@@ -76,6 +77,6 @@ class SubscriptionService {
         'Threshold: ${BotState.getThreshold()}\n'
         'Subscribers: ${BotState.subscribers.length}\n'
         'Monitoring: ${BotState.getTimer() != null ? "Active" : "Inactive"}\n'
-        'Cached coins: ${BotState.circulatingSupplyCache.length}';
+        'Cached coins: ${BotState.marketCapCache.length}';
   }
 }

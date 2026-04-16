@@ -22,7 +22,8 @@ class BotState {
   );
   static Timer? priceCheckTimer;
   static final Map<String, String> generatedTickerCache = <String, String>{};
-  static final Map<String, BigInt> circulatingSupplyCache = <String, BigInt>{};
+  static final Map<String, String> baseCoinCache = <String, String>{};
+  static final Map<String, double> marketCapCache = <String, double>{};
   static final Map<String, MarketSnapshot> marketSnapshots =
       <String, MarketSnapshot>{};
   static Timer? cacheRefreshTimer;

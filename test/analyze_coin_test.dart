@@ -11,25 +11,32 @@ void main() {
   tearDown(() {
     ApiService.resetHttpClient();
     BotState.generatedTickerCache.clear();
-    BotState.circulatingSupplyCache.clear();
+    BotState.baseCoinCache.clear();
+    BotState.marketCapCache.clear();
   });
 
   group('analyzeCoin', () {
-    test('returns the full BTC analysis message from mocked API responses', () async {
-      ApiService.setHttpClient(buildBtcAnalyzeMockClient());
+    test(
+      'returns the full BTC analysis message from mocked API responses',
+      () async {
+        ApiService.setHttpClient(buildBtcAnalyzeMockClient());
 
-      final message = await analyzeCoin('btc');
+        final message = await analyzeCoin('btc');
 
-      expect(message, btcExpectedAnalyzeMessage);
-    });
+        expect(message, btcExpectedAnalyzeMessage);
+      },
+    );
 
-    test('returns the full SIREN analysis message from mocked API responses', () async {
-      ApiService.setHttpClient(buildSirenAnalyzeMockClient());
+    test(
+      'returns the full SIREN analysis message from mocked API responses',
+      () async {
+        ApiService.setHttpClient(buildSirenAnalyzeMockClient());
 
-      final message = await analyzeCoin('siren');
+        final message = await analyzeCoin('siren');
 
-      expect(message, sirenExpectedAnalyzeMessage);
-    });
+        expect(message, sirenExpectedAnalyzeMessage);
+      },
+    );
 
     test('normalizes multiplier contracts in the full analyze flow', () async {
       ApiService.setHttpClient(buildPepeAnalyzeMockClient());
